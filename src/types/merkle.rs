@@ -3,27 +3,121 @@ use super::hash::{Hashable, H256};
 /// A Merkle tree.
 #[derive(Debug, Default)]
 pub struct MerkleTree {
+    /// Root of the Merkle Tree 
+    root: H256,
+    /// The number of leaves in the Merkle Tree
+    leaf_size: usize, 
+    /// Merkle tree
+    merkle_tree: Vec<Vec<H256>>,
 }
 
 impl MerkleTree {
     pub fn new<T>(data: &[T]) -> Self where T: Hashable, {
-        unimplemented!()
+        //unimplemented!()
+        // hash all elements and put them into leafs 
+        let mut leafs = data.iter().map(|x| x.hash()).collect::<Vec<H256>>();
+        // *get the total number of valid leafs, if the number of leafs is not a power of 2, padding the merkle tree with the last leaf 
+        let leaf_size = leafs.len();
+        // pad the leafs to be a even number 
+        if leaf_size % 2 == 1 {
+            leafs.push(leafs[leaf_size - 1]);
+        }
+        if leaf_size ==0{
+            panic!("no leaf in the merkle tree");
+        }
+        let mut tree_hashes = Vec::new();
+        let current_level : usize = 0; 
+        tree_hashes.push(leafs);
+        loop {
+            let mut current_hashes = Vec::new();
+            let current_level = current_level + 1;
+            let mut i = 0;
+            while i < tree_hashes[current_level - 1].len() {
+                let mut hasher = ring::digest::Context::new(&ring::digest::SHA256);
+                hasher.update(tree_hashes[current_level - 1][i].as_ref());
+                hasher.update(tree_hashes[current_level - 1][i + 1].as_ref());
+                let hash = hasher.finish();
+                current_hashes.push(hash.into());
+                i = i + 2;
+            }
+            let current_hashes_len = current_hashes.len();
+            if current_hashes_len != 1 && current_hashes_len % 2 == 1 {
+                current_hashes.push(current_hashes[current_hashes_len - 1]);
+            }
+            tree_hashes.push(current_hashes);
+            if current_hashes_len == 1 {
+                break;
+            }
+        }
+        let root = tree_hashes[tree_hashes.len() - 1][0].clone();
+        // return the merkle tree
+        MerkleTree {
+            root,
+            leaf_size,
+            merkle_tree: tree_hashes,
+        }
+
     }
 
     pub fn root(&self) -> H256 {
-        unimplemented!()
+        //unimplemented!()
+        self.root
     }
 
     /// Returns the Merkle Proof of data at index i
     pub fn proof(&self, index: usize) -> Vec<H256> {
-        unimplemented!()
+        //unimplemented!()
+        let mut proof = Vec::new();
+        let mut current_level: usize = 0; 
+        let mut current_index = index;
+        let tree_depth = self.merkle_tree.len();
+        loop {
+            let sbling_index = get_sbling(current_index);
+            let sbling_hash = self.merkle_tree[current_level][sbling_index].clone();
+            proof.push(sbling_hash);
+            current_index = current_index / 2;
+            current_level = current_level + 1;
+            if current_level == tree_depth - 1 {
+                break;
+            }
+        }
+        proof
     }
 }
-
+fn get_sbling(index: usize) -> usize {
+    let mut sbling_index = 0;
+    if index % 2 == 0 {
+        sbling_index = index + 1;
+    } else {
+        sbling_index = index - 1;
+    }
+    sbling_index
+}
 /// Verify that the datum hash with a vector of proofs will produce the Merkle root. Also need the
 /// index of datum and `leaf_size`, the total number of leaves.
 pub fn verify(root: &H256, datum: &H256, proof: &[H256], index: usize, leaf_size: usize) -> bool {
-    unimplemented!()
+    //unimplemented!()
+    let mut current_hash = datum.clone();
+    if index > leaf_size - 1 {
+        return false;
+    }
+    let mut hasher = ring::digest::Context::new(&ring::digest::SHA256);
+    // watch out, the hash order matters
+    let mut current_index = index;
+    for i in 0..proof.len() {
+        if current_index % 2 == 0 {
+            hasher.update(current_hash.as_ref());
+            hasher.update(proof[i].as_ref());
+        } else {
+            hasher.update(proof[i].as_ref());
+            hasher.update(current_hash.as_ref());
+        }
+        let hash = hasher.finish();
+        current_hash = hash.into();
+        hasher = ring::digest::Context::new(&ring::digest::SHA256);
+        current_index = current_index / 2;
+    }
+    current_hash == *root
 }
 // DO NOT CHANGE THIS COMMENT, IT IS FOR AUTOGRADER. BEFORE TEST
 
