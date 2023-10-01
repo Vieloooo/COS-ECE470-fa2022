@@ -1,17 +1,18 @@
 use serde::{Serialize, Deserialize};
-
+use ring::digest; 
 // 20-byte address
 #[derive(Eq, PartialEq, Serialize, Deserialize, Clone, Hash, Default, Copy)]
 pub struct Address([u8; 20]);
 
 impl std::convert::From<&[u8; 20]> for Address {
+    // this function is used to convert from a slice of 20 bytes(160 bits) to an Address 
     fn from(input: &[u8; 20]) -> Address {
         let mut buffer: [u8; 20] = [0; 20];
         buffer[..].copy_from_slice(input);
         Address(buffer)
     }
 }
-
+// Why there are two implementation for From trait? 
 impl std::convert::From<[u8; 20]> for Address {
     fn from(input: [u8; 20]) -> Address {
         Address(input)
@@ -47,8 +48,14 @@ impl std::fmt::Debug for Address {
 }
 
 impl Address {
+    /// This function hash the input bytes and conver the last 20 bytes of hash to Address 
     pub fn from_public_key_bytes(bytes: &[u8]) -> Address {
-        unimplemented!()
+        //unimplemented!()
+        let hash = digest::digest(&digest::SHA256, bytes);
+        //get the last 20 bytes of hash 
+        let mut buffer: [u8; 20] = [0; 20];
+        buffer[..].copy_from_slice(&hash.as_ref()[bytes.len() - 20..]);
+        Address(buffer)
     }
 }
 // DO NOT CHANGE THIS COMMENT, IT IS FOR AUTOGRADER. BEFORE TEST
