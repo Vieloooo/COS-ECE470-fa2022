@@ -6,11 +6,11 @@ use rand::prelude::*;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Header {
     /// prev block hash 
-    parent: H256,
-    difficulty: H256,
-    merkle_root: H256,
-    timestamp: std::time::SystemTime,
-    nonce: u32,
+    pub parent: H256,
+    pub difficulty: H256,
+    pub merkle_root: H256,
+    pub timestamp: std::time::SystemTime,
+    pub nonce: u32,
 }
 impl Hashable for Header {
     fn hash (&self) -> H256 {
@@ -20,13 +20,13 @@ impl Hashable for Header {
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Body {
-    tx_count: usize, 
-    txs: Vec<SignedTransaction>, 
+    pub tx_count: usize, 
+    pub txs: Vec<SignedTransaction>, 
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Block {
-    header: Header,
-    body: Body,
+    pub header: Header,
+    pub body: Body,
 }
 
 impl Hashable for Block {
@@ -83,7 +83,6 @@ pub fn generate_empty_body() -> Body {
     }
 }
 
-#[cfg(any(test, test_utilities))]
 pub fn generate_random_block(parent: &H256) -> Block {
     //unimplemented!()
     let header = generate_random_header(parent);

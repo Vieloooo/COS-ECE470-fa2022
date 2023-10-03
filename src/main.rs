@@ -81,8 +81,9 @@ fn main() {
     worker_ctx.start();
 
     // start the miner
-    let (miner_ctx, miner, finished_block_chan) = miner::new();
-    let miner_worker_ctx = miner::worker::Worker::new(&server, finished_block_chan);
+    // The miner thread will manage the block update and mining process
+    let (miner_ctx, miner, finished_block_chan) = miner::new(&blockchain);
+    let miner_worker_ctx = miner::worker::Worker::new(&server, finished_block_chan, &blockchain);
     miner_ctx.start();
     miner_worker_ctx.start();
 

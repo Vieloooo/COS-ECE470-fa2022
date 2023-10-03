@@ -1,17 +1,17 @@
 use crate::types::block::{Block, self};
 use crate::types::hash::{H256, Hashable};
 use std::collections::HashMap;
-struct block_with_height {
-    block: Block,
+pub struct block_with_height {
+    pub block: Block,
     ///height is useful when handling uncle blocks 
-    height: u32,
+    pub height: u32,
 }
 
 pub struct Blockchain {
     /// we save all blocks in a hashmap, key is the hash of the block, value is (block, height)
-    blocks: HashMap<H256, block_with_height>,
-    tail_block: H256,
-    height: u32,
+    pub blocks: HashMap<H256, block_with_height>,
+    pub tail_block: H256,
+    pub height: u32,
 
 }
 
