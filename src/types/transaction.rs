@@ -4,7 +4,7 @@ use ring::signature::{Ed25519KeyPair, Signature, KeyPair, VerificationAlgorithm,
 use rand::Rng;
 use bincode;
 use super::address::Address;
-
+use super::hash::{Hashable, H256};
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Transaction {
     /// Sender's address
@@ -22,6 +22,15 @@ pub struct SignedTransaction {
     pub transaction: Transaction,
     /// Signature saved in vector
     pub signature: Vec<u8>,
+}
+
+impl Hashable for SignedTransaction{
+    fn hash(&self) -> H256 {
+        // First, we serialize the tx into bytes using bitnodes 
+        // Then, we hash the bytes using ring::digest::digest
+        let tx_bytes = bincode::serialize(&self).unwrap();
+        ring::digest::digest(&ring::digest::SHA256, &tx_bytes).into()
+    }
 }
 
 /// Create digital signature of a transaction

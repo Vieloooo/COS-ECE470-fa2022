@@ -22,11 +22,19 @@ impl MerkleTree {
         if leaf_size % 2 == 1 {
             leafs.push(leafs[leaf_size - 1]);
         }
-        if leaf_size ==0{
-            panic!("no leaf in the merkle tree");
-        }
         let mut tree_hashes = Vec::new();
         let current_level : usize = 0; 
+        if leaf_size ==0{
+            //panic!("no leaf in the merkle tree");
+            //just push an empty vector into the tree_hashes
+            // the root is zero 
+
+            return MerkleTree {
+                root: H256::default(),
+                leaf_size,
+                merkle_tree: tree_hashes,
+            };
+        }
         tree_hashes.push(leafs);
         loop {
             let mut current_hashes = Vec::new();
@@ -67,6 +75,13 @@ impl MerkleTree {
     /// Returns the Merkle Proof of data at index i
     pub fn proof(&self, index: usize) -> Vec<H256> {
         //unimplemented!()
+        if index > self.leaf_size - 1 {
+            panic!("index out of range");
+        }
+        if self.leaf_size == 0{
+            panic!(" Can not proof for an empty merkle tree");
+        }
+
         let mut proof = Vec::new();
         let mut current_level: usize = 0; 
         let mut current_index = index;
@@ -98,9 +113,10 @@ fn get_sbling(index: usize) -> usize {
 pub fn verify(root: &H256, datum: &H256, proof: &[H256], index: usize, leaf_size: usize) -> bool {
     //unimplemented!()
     let mut current_hash = datum.clone();
-    if index > leaf_size - 1 {
+    if index > leaf_size - 1 || leaf_size == 0{
         return false;
     }
+
     let mut hasher = ring::digest::Context::new(&ring::digest::SHA256);
     // watch out, the hash order matters
     let mut current_index = index;
