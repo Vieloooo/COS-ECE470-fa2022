@@ -2,6 +2,7 @@ use serde::{Serialize, Deserialize};
 use std::convert::TryInto;
 #[cfg(any(test, test_utilities))]
 use rand::Rng;
+use rand::prelude::*;
 
 /// An object that can be meaningfully hashed.
 pub trait Hashable {
@@ -109,7 +110,7 @@ impl PartialOrd for H256 {
     }
 }
 
-#[cfg(any(test, test_utilities))]
+//#[cfg(any(test, test_utilities))]
 pub fn generate_random_hash() -> H256 {
     let mut rng = rand::thread_rng();
     let random_bytes: Vec<u8> = (0..32).map(|_| rng.gen()).collect();

@@ -47,8 +47,13 @@ impl Block {
         //unimplemented!()
         self.header.difficulty
     }
+    pub fn genesis() -> Block{
+        let body = generate_empty_body();
+        let header = generate_random_header(&H256::default());
+        Block { header: header, body: body }
+    }
 }
-#[cfg(any(test, test_utilities))]
+
 pub fn generate_random_header(parent: &H256) -> Header{
     //gen a difficulty with 10 bit zero in the first 256 bits in H256 
 
@@ -69,7 +74,7 @@ pub fn generate_random_header(parent: &H256) -> Header{
     }
 }
 
-#[cfg(any(test, test_utilities))]
+
 pub fn generate_empty_body() -> Body {
     //unimplemented!()
     Body {
