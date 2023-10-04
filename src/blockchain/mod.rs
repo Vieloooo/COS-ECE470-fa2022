@@ -1,7 +1,7 @@
 use crate::types::block::{Block, self};
 use crate::types::hash::{H256, Hashable};
 use std::collections::HashMap;
-pub struct block_with_height {
+pub struct BlockWithHeight {
     pub block: Block,
     ///height is useful when handling uncle blocks 
     pub height: u32,
@@ -9,7 +9,7 @@ pub struct block_with_height {
 
 pub struct Blockchain {
     /// we save all blocks in a hashmap, key is the hash of the block, value is (block, height)
-    pub blocks: HashMap<H256, block_with_height>,
+    pub blocks: HashMap<H256, BlockWithHeight>,
     pub tail_block: H256,
     pub height: u32,
 
@@ -22,7 +22,7 @@ impl Blockchain {
         let mut blocks = HashMap::new();
         let genesis_block = Block::genesis();
         let genesis_hash = genesis_block.hash();
-        blocks.insert(genesis_hash, block_with_height{block: genesis_block, height: 0});
+        blocks.insert(genesis_hash, BlockWithHeight{block: genesis_block, height: 0});
         Blockchain {
             blocks,
             tail_block: genesis_hash,
@@ -35,7 +35,7 @@ impl Blockchain {
         //unimplemented!()
         if block.get_parent() == self.tail_block {
             let block_hash = block.hash();
-            self.blocks.insert(block_hash, block_with_height{block: block.clone(), height: self.height + 1});
+            self.blocks.insert(block_hash, BlockWithHeight{block: block.clone(), height: self.height + 1});
             self.tail_block = block_hash;
             self.height += 1;
         }else{
@@ -50,7 +50,7 @@ impl Blockchain {
                 self.tail_block = block_hash;
                 self.height = block_height;
             }
-            self.blocks.insert(block_hash, block_with_height{block: block.clone(), height: block_height});
+            self.blocks.insert(block_hash, BlockWithHeight{block: block.clone(), height: block_height});
         }   
             
 

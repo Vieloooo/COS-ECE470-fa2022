@@ -40,10 +40,8 @@ impl Worker {
             let _block = self.finished_block_chan.recv().expect("Receive finished block error");
             // TODO for student: insert this finished block to blockchain, and broadcast this block hash
             // update the blockchain 
-            println!("worker get a new block");
-            let mut blockchain = self.blockchain.lock().unwrap();
-            blockchain.insert(&_block);
-            println!("upload a new block to the chain");
+            //let mut blockchain = self.blockchain.lock().unwrap();
+            //blockchain.insert(&_block);
             //broadcast 
         }
     }
