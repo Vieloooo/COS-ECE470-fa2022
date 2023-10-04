@@ -1,9 +1,9 @@
-use crate::types::block::{Block, self};
-use crate::types::hash::{H256, Hashable};
+use crate::types::block::{self, Block};
+use crate::types::hash::{Hashable, H256};
 use std::collections::HashMap;
 pub struct BlockWithHeight {
     pub block: Block,
-    ///height is useful when handling uncle blocks 
+    ///height is useful when handling uncle blocks
     pub height: u32,
 }
 
@@ -12,7 +12,6 @@ pub struct Blockchain {
     pub blocks: HashMap<H256, BlockWithHeight>,
     pub tail_block: H256,
     pub height: u32,
-
 }
 
 impl Blockchain {
@@ -22,7 +21,13 @@ impl Blockchain {
         let mut blocks = HashMap::new();
         let genesis_block = Block::genesis();
         let genesis_hash = genesis_block.hash();
-        blocks.insert(genesis_hash, BlockWithHeight{block: genesis_block, height: 0});
+        blocks.insert(
+            genesis_hash,
+            BlockWithHeight {
+                block: genesis_block,
+                height: 0,
+            },
+        );
         Blockchain {
             blocks,
             tail_block: genesis_hash,
@@ -33,27 +38,41 @@ impl Blockchain {
     /// Insert a block into blockchain, the block.parent must in the blockchain
     pub fn insert(&mut self, block: &Block) {
         //unimplemented!()
+        //check if the block is already in the blocks
+        if self.blocks.contains_key(&block.hash()) {
+            return;
+        }
         if block.get_parent() == self.tail_block {
             let block_hash = block.hash();
-            self.blocks.insert(block_hash, BlockWithHeight{block: block.clone(), height: self.height + 1});
+            self.blocks.insert(
+                block_hash,
+                BlockWithHeight {
+                    block: block.clone(),
+                    height: self.height + 1,
+                },
+            );
             self.tail_block = block_hash;
             self.height += 1;
-        }else{
-            //handle a fork 
-            let mut block_hash = block.hash();
-            let mut block_parent = block.get_parent();
-            let mut block_parent_height = self.blocks.get(&block_parent).unwrap().height;
+        } else {
+            //handle a fork
+            let block_hash = block.hash();
+            let block_parent = block.get_parent();
+            let block_parent_height = self.blocks.get(&block_parent).unwrap().height;
             let block_height = block_parent_height + 1;
             if block_height > self.height {
-                // the fork is longer than the current chain 
+                // the fork is longer than the current chain
                 //update the tail block and height
                 self.tail_block = block_hash;
                 self.height = block_height;
             }
-            self.blocks.insert(block_hash, BlockWithHeight{block: block.clone(), height: block_height});
-        }   
-            
-
+            self.blocks.insert(
+                block_hash,
+                BlockWithHeight {
+                    block: block.clone(),
+                    height: block_height,
+                },
+            );
+        }
     }
 
     /// Get the last block's hash of the longest chain
@@ -92,7 +111,6 @@ mod tests {
         let block = generate_random_block(&genesis_hash);
         blockchain.insert(&block);
         assert_eq!(blockchain.tip(), block.hash());
-
     }
     /// Test 20 blocks insert into blockchain, and read the longest chain
     #[test]
@@ -109,19 +127,19 @@ mod tests {
         let blocks = blockchain.all_blocks_in_longest_chain();
         assert_eq!(blocks.len(), 21);
     }
-    /// Test forks 
-    /// 1 -- 2 -- 4 
+    /// Test forks
+    /// 1 -- 2 -- 4
     ///  \- 3 -- 5 -- 6
     #[test]
     fn insert_fork() {
         let mut blockchain = Blockchain::new();
         let genesis_hash = blockchain.tip();
-        let mut block1 = generate_random_block(&genesis_hash);
-        let mut block2 = generate_random_block(&block1.hash());
-        let mut block3 = generate_random_block(&block1.hash());
-        let mut block4 = generate_random_block(&block2.hash());
-        let mut block5 = generate_random_block(&block3.hash());
-        let mut block6 = generate_random_block(&block5.hash());
+        let block1 = generate_random_block(&genesis_hash);
+        let block2 = generate_random_block(&block1.hash());
+        let block3 = generate_random_block(&block1.hash());
+        let block4 = generate_random_block(&block2.hash());
+        let block5 = generate_random_block(&block3.hash());
+        let block6 = generate_random_block(&block5.hash());
         blockchain.insert(&block1);
         blockchain.insert(&block2);
         blockchain.insert(&block3);
@@ -133,7 +151,6 @@ mod tests {
         let blocks = blockchain.all_blocks_in_longest_chain();
         assert_eq!(blocks.len(), 5);
     }
-
 }
 
 // DO NOT CHANGE THIS COMMENT, IT IS FOR AUTOGRADER. AFTER TEST

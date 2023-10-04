@@ -1,5 +1,6 @@
 pub mod worker;
 
+use log::debug;
 use log::info;
 use std::sync::{Arc, Mutex};
 use crossbeam::channel::{unbounded, Receiver, Sender, TryRecvError};
@@ -21,7 +22,6 @@ enum OperatingState {
     Paused,
     Run(u64),
     ShutDown,
-    Idle, 
 }
 
 pub struct Context {
@@ -65,7 +65,8 @@ pub fn new(blockchain:&Arc<Mutex<Blockchain>> ) -> (Context, Handle, Receiver<Bl
 fn test_new() -> (Context, Handle, Receiver<Block>) {
    let blockchain = Arc::new(Mutex::new(Blockchain::new()));
    println!("The genesis hash is {:?}", blockchain.lock().unwrap().tip());
-    new(&blockchain)
+   new(&blockchain)
+   
 }
 
 impl Handle {
@@ -123,23 +124,7 @@ impl Context {
                 OperatingState::ShutDown => {
                     return;
                 }
-                OperatingState::Idle => {
-                    let signal = self.control_chan.recv().unwrap();
-                    match signal {
-                        ControlSignal::Exit => {
-                            info!("Miner shutting down");
-                            self.operating_state = OperatingState::ShutDown;
-                        }
-                        ControlSignal::Start(i) => {
-                            info!("Miner starting in continuous mode with lambda {}", i);
-                            self.operating_state = OperatingState::Run(i);
-                        }
-                        ControlSignal::Update => {
-                            self.last_block_hash = self.blockchain.lock().unwrap().tip();
-                            println!("Updated: The lastest block hash is {:?}", self.last_block_hash);
-                        }
-                    };
-                }
+                
                 _ => match self.control_chan.try_recv() {
                     Ok(signal) => {
                         match signal {
@@ -154,7 +139,7 @@ impl Context {
                             ControlSignal::Update => {
                                 //unimplemented!()
                                 self.last_block_hash = self.blockchain.lock().unwrap().tip();
-                            println!("Updated: The lastest block hash is {:?}", self.last_block_hash);
+                                println!("Updated: The lastest block hash is {:?}", self.last_block_hash);
                             }
                         };
                     }
@@ -166,11 +151,11 @@ impl Context {
                 return;
             }
 
-            // TODO for student: actual mining, create a block
-            println!("Mining a new block"); 
+            // TODO for student: actual mining, create a block 
             let mut blockchain = self.blockchain.lock().unwrap();
             //get the tip of the blockchain
-            //let tip = blockchain.tip();
+            self.last_block_hash = blockchain.tip();
+            debug!("Start mining a block from {:?}", self.last_block_hash); 
             let mut new_block = generate_random_block(&self.last_block_hash);
             new_block.header.nonce = 0;
             //get the difficulty of the tip
@@ -182,10 +167,9 @@ impl Context {
                 }
                 new_block.header.nonce += 1;
             }
-            println!("mined a new block, hash is {:?}", new_block.hash());
-            self.operating_state = OperatingState::Idle;
+            debug!("mined a new block, hash is {:?}", new_block.hash());
 
-            // TODO for student: if block mining finished, you can have something like: self.finished_block_chan.send(block.clone()).expect("Send finished block error");
+            // TODO 
             blockchain.insert(&new_block);
             self.finished_block_chan.send(new_block.clone()).expect("Send finished block error");
 
@@ -210,7 +194,7 @@ mod test {
     #[timeout(60000)]
     fn miner_three_block() {
         let (miner_ctx, miner_handle, finished_block_chan) = super::test_new();
-        miner_ctx.start();
+        miner_ctx.start(); 
         // This test 
         miner_handle.start(0);
         let mut block_prev = finished_block_chan.recv().unwrap();

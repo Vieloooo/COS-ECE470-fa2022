@@ -18,7 +18,7 @@ use std::process;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time;
-
+use crate::types::block_buffer::BlockBuffer; 
 fn main() {
     // parse command line arguments
     let matches = clap_app!(Bitcoin =>
@@ -37,6 +37,7 @@ fn main() {
     stderrlog::new().verbosity(verbosity).init().unwrap();
     let blockchain = Blockchain::new();
     let blockchain = Arc::new(Mutex::new(blockchain));
+    let block_buffer = Arc::new(Mutex::new(BlockBuffer::new()));
     // parse p2p server address
     let p2p_addr = matches
         .value_of("peer_addr")
@@ -77,6 +78,8 @@ fn main() {
         p2p_workers,
         msg_rx,
         &server,
+        &blockchain,
+        &block_buffer,
     );
     worker_ctx.start();
 

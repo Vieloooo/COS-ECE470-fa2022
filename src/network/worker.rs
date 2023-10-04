@@ -1,8 +1,11 @@
 use super::message::Message;
 use super::peer;
 use super::server::Handle as ServerHandle;
-use crate::types::hash::H256;
-
+use crate::types::block::Block;
+use crate::types::hash::{H256, Hashable};
+use crate::types::block_buffer::BlockBuffer;
+use crate::Blockchain; 
+use std::sync::{Arc, Mutex};
 use log::{debug, warn, error};
 
 use std::thread;
@@ -16,6 +19,8 @@ pub struct Worker {
     msg_chan: smol::channel::Receiver<(Vec<u8>, peer::Handle)>,
     num_worker: usize,
     server: ServerHandle,
+    blockchain: Arc<Mutex<Blockchain>>,
+    block_buffer: Arc<Mutex<BlockBuffer>>, 
 }
 
 
@@ -24,11 +29,15 @@ impl Worker {
         num_worker: usize,
         msg_src: smol::channel::Receiver<(Vec<u8>, peer::Handle)>,
         server: &ServerHandle,
+        _blockchain: &Arc<Mutex<Blockchain>>,
+        _block_buffer: &Arc<Mutex<BlockBuffer>>,
     ) -> Self {
         Self {
             msg_chan: msg_src,
             num_worker,
             server: server.clone(),
+            blockchain: Arc::clone(_blockchain),
+            block_buffer: Arc::clone(_block_buffer),  
         }
     }
 
@@ -61,6 +70,70 @@ impl Worker {
                 Message::Pong(nonce) => {
                     debug!("Pong: {}", nonce);
                 }
+                Message::NewBlockHashes(hashes) => {
+                    if hashes.is_empty(){
+                        continue;
+                    }
+                    debug!("NewBlockHashes: {:?}", hashes);
+                    let mut blocks_I_dont_have = Vec::new();
+                    for hash in hashes {
+                        if !self.blockchain.lock().unwrap().blocks.contains_key(&hash) {
+                            blocks_I_dont_have.push(hash.clone());
+                        }
+                    } 
+                    peer.write(Message::GetBlocks(blocks_I_dont_have));
+                }
+                Message::GetBlocks(hashes) => {
+                    if hashes.is_empty(){
+                        continue;
+                    }
+                    debug!("GetBlocks: {:?}", hashes);
+                    let mut blocks = Vec::new();
+                    for hash in hashes {
+                        if let Some(block) = self.blockchain.lock().unwrap().blocks.get(&hash) {
+                            blocks.push(block.block.clone());
+                        }
+                    }
+                    peer.write(Message::Blocks(blocks));
+                }
+                Message::Blocks(input_blocks) => {
+                    if input_blocks.is_empty(){
+                        continue;
+                    }
+                    debug!("Blocks: {:?}", input_blocks);
+                    //should verify the block in the future 
+                    //remove duplicated blocks which we already have
+                    let mut blocks_I_dont_have = Vec::new();
+                    let mut orphan_blocks = Vec::new(); 
+                    let mut new_block_hashes = Vec::new(); 
+                    for block in input_blocks {
+                        if !self.blockchain.lock().unwrap().blocks.contains_key(&block.hash()) {
+                            new_block_hashes.push(block.hash());
+                            blocks_I_dont_have.push(block);
+                        }
+                    }
+                    //broadcast the newcomming block hashes  
+                    if !new_block_hashes.is_empty() {
+                        self.server.broadcast(Message::NewBlockHashes(new_block_hashes));
+                    }
+                    //  for each new block, send it to the block buffer, this buffer will handle the process of pushing the block to the blockchain
+                    for block in blocks_I_dont_have {
+                        // In this working thread, only have 1 working loop and 1 buffer, so buffer can borrow the blockchain, no need for clone  
+                        let parent_hash = block.header.parent; 
+                        let have_parents = self.block_buffer.lock().unwrap().send_block(block, &self.blockchain);
+
+                        // if the newcoming block is an orphan block, send a request to get the parent block
+                        if !have_parents {
+                            orphan_blocks.push(parent_hash);
+                        }
+
+                    }
+                    // request the parent block of the orphan blocks 
+                    if !orphan_blocks.is_empty() {
+                        peer.write(Message::GetBlocks(orphan_blocks));
+                    }
+                    // boardcast new incoming blocks that I not have 
+                }
                 _ => unimplemented!(),
             }
         }
@@ -90,9 +163,12 @@ impl TestMsgSender {
 fn generate_test_worker_and_start() -> (TestMsgSender, ServerTestReceiver, Vec<H256>) {
     let (server, server_receiver) = ServerHandle::new_for_test();
     let (test_msg_sender, msg_chan) = TestMsgSender::new();
-    let worker = Worker::new(1, msg_chan, &server);
+    let blockchain = Arc::new(Mutex::new(Blockchain::new()));
+    let block_buffer = Arc::new(Mutex::new(BlockBuffer::new()));
+    let worker = Worker::new(1, msg_chan, &server, &blockchain, &block_buffer);
+    let init_hash = blockchain.lock().unwrap().tip();
     worker.start(); 
-    (test_msg_sender, server_receiver, vec![])
+    (test_msg_sender, server_receiver, vec![init_hash])
 }
 
 // DO NOT CHANGE THIS COMMENT, IT IS FOR AUTOGRADER. BEFORE TEST
@@ -111,6 +187,7 @@ mod test {
     fn reply_new_block_hashes() {
         let (test_msg_sender, _server_receiver, v) = generate_test_worker_and_start();
         let random_block = generate_random_block(v.last().unwrap());
+        log::debug!("gen a rand block {:?}", random_block.hash());
         let mut peer_receiver = test_msg_sender.send(Message::NewBlockHashes(vec![random_block.hash()]));
         let reply = peer_receiver.recv();
         if let Message::GetBlocks(v) = reply {
