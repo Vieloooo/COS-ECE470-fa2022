@@ -47,17 +47,45 @@ impl Block {
         //unimplemented!()
         self.header.difficulty
     }
+    /// genesis will return a static block 
     pub fn genesis() -> Block{
         let body = generate_empty_body();
-        let header = generate_random_header(&H256::default());
-        Block { header: header, body: body }
+        let header = generate_genesis_header();
+        let mut gb = Block { header: header, body: body }; 
+        loop {
+            if gb.hash() < gb.header.difficulty {
+                break;
+            }
+            gb.header.nonce += 1;
+        }
+        gb
     }
 }
+fn generate_genesis_header() -> Header{
+    // generate a 256 bits byte list with 16 bits zero, rest 1 
+    let mut difficulty = H256::default();
+    difficulty.0[0] = 0;
+    difficulty.0[1] = 0;
+    for i in 2..32 {
+        difficulty.0[i] = 255;
+    }
+    // make a static time stamp 
+    use chrono::{TimeZone, Utc};
+    let genesis_time = Utc.ymd(2023, 10, 01).and_hms(0,0,0); 
+    let timestamp = std::time::SystemTime::from(genesis_time); 
+    let merkle_root = H256::default(); 
+    Header { parent: H256::default(), difficulty: difficulty, merkle_root: merkle_root, timestamp: timestamp, nonce: 0}
 
+}
 pub fn generate_random_header(parent: &H256) -> Header{
     //gen a difficulty with 10 bit zero in the first 256 bits in H256 
 
-    let mut difficulty = crate::types::hash::generate_random_hash();
+    let mut difficulty = H256::default();
+    difficulty.0[0] = 0;
+    difficulty.0[1] = 0;
+    for i in 2..32 {
+        difficulty.0[i] = 255;
+    }
     // make the first 8 bits in difficulty zero 
     difficulty.0[0] = 0;
     // nounce should be a random u32 using crate ring 

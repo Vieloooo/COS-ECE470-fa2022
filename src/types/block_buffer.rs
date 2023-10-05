@@ -23,18 +23,21 @@ impl BlockBuffer {
         let parent_hash = _block.header.parent;
         let mut if_in = false;
         let mut blockchain_unlocked = blockchain.lock().unwrap();
-        if_in = blockchain_unlocked
-            .blocks
-            .contains_key(&parent_hash);
+        if_in = blockchain_unlocked.blocks.contains_key(&parent_hash);
         if !if_in {
+            // for orphan blocks, just insert into blocks 
             self.buffer.insert(_block.hash(), _block);
             return false;
         }
         //This thread will hold the blockchain lock until the block is added to the blockchain
-        self.push_block(_block, &mut blockchain_unlocked );
+        self.push_block(_block, &mut blockchain_unlocked);
         true
     }
     fn push_block(&mut self, _block: Block, blockchain_unlocked: &mut Blockchain) {
+        //just throw invalid PoW block with parents, for currently invalid orphan PoW block, we save them in buffer
+        if _block.hash() > blockchain_unlocked.get_difficulty() {
+            return;
+        }
         blockchain_unlocked.insert(&_block);
         // check buffer, push all pushable blocks from buffer to chain
         loop {
@@ -46,9 +49,15 @@ impl BlockBuffer {
                     .blocks
                     .contains_key(&block.header.parent)
                 {
-                    blockchain_unlocked.insert(block);
-                    to_remove.push(hash.clone());
-                    added = true;
+                    if block.hash() <= blockchain_unlocked.get_difficulty(){
+                        blockchain_unlocked.insert(block);
+                        to_remove.push(hash.clone());
+                        added = true;
+                    }else{
+                        //once the invalid pow orphan block find its mom, remove invalid PoW block 
+                        to_remove.push(hash.clone());
+                    }
+                    
                 }
             }
             for id in to_remove {

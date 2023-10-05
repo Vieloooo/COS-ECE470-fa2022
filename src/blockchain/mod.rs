@@ -34,7 +34,13 @@ impl Blockchain {
             height: 0,
         }
     }
-
+    /// get difficulty 
+    pub fn get_difficulty(&self) -> H256 {
+        let block_hash = self.tail_block;
+        let block = self.blocks.get(&block_hash).unwrap();
+        block.block.get_difficulty()
+        
+    }
     /// Insert a block into blockchain, the block.parent must in the blockchain
     pub fn insert(&mut self, block: &Block) {
         //unimplemented!()
@@ -150,6 +156,14 @@ mod tests {
         assert_eq!(blockchain.tip(), block6.hash());
         let blocks = blockchain.all_blocks_in_longest_chain();
         assert_eq!(blocks.len(), 5);
+    }
+    fn test_genesis(){
+        // test genesis block
+        let b1 = Block::genesis();
+        let b2 = Block::genesis(); 
+        let b3 = Block::genesis();
+        assert_eq!(b1.hash(), b2.hash());
+        assert_eq!(b1.hash(), b3.hash());
     }
 }
 

@@ -139,7 +139,7 @@ impl Context {
                             ControlSignal::Update => {
                                 //unimplemented!()
                                 self.last_block_hash = self.blockchain.lock().unwrap().tip();
-                                println!("Updated: The lastest block hash is {:?}", self.last_block_hash);
+                                info!("Updated: The lastest block hash is {:?}", self.last_block_hash);
                             }
                         };
                     }
@@ -152,14 +152,17 @@ impl Context {
             }
 
             // TODO for student: actual mining, create a block 
-            let mut blockchain = self.blockchain.lock().unwrap();
-            //get the tip of the blockchain
-            self.last_block_hash = blockchain.tip();
+            let mut difficulty = H256::default(); 
+            //get the last hash and difficulty of the blockchain
+            {
+            self.last_block_hash = self.blockchain.lock().unwrap().tip();
+            difficulty = self.blockchain.lock().unwrap().get_difficulty(); 
+            }
             debug!("Start mining a block from {:?}", self.last_block_hash); 
             let mut new_block = generate_random_block(&self.last_block_hash);
             new_block.header.nonce = 0;
             //get the difficulty of the tip
-            new_block.header.difficulty = blockchain.blocks.get(&self.last_block_hash).unwrap().block.get_difficulty();
+            new_block.header.difficulty = difficulty; 
             // range nounce from 0 to u32::max_value()
             loop {
                 if new_block.hash() < new_block.header.difficulty {
@@ -169,8 +172,7 @@ impl Context {
             }
             debug!("mined a new block, hash is {:?}", new_block.hash());
 
-            // TODO 
-            blockchain.insert(&new_block);
+            //lockchain.insert(&new_block);
             self.finished_block_chan.send(new_block.clone()).expect("Send finished block error");
 
             if let OperatingState::Run(i) = self.operating_state {
@@ -209,3 +211,7 @@ mod test {
 }
 
 // DO NOT CHANGE THIS COMMENT, IT IS FOR AUTOGRADER. AFTER TEST
+
+// node1: http://127.0.0.1:7000/miner/start?lambda=1500000 1.5 sec per block 
+// node2: http://127.0.0.1:7001/miner/start?lambda=2000000 2 sec per block 
+// node3: http://127.0.0.1:7002/miner/start?lambda=2000000 2 sec per block

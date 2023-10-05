@@ -78,6 +78,7 @@ impl Server {
                     };
                     match url.path() {
                         "/miner/start" => {
+                            info!("Received request to start mining");
                             let params = url.query_pairs();
                             let params: HashMap<_, _> = params.into_owned().collect();
                             let lambda = match params.get("lambda") {

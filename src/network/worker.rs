@@ -5,6 +5,7 @@ use crate::types::block::Block;
 use crate::types::hash::{H256, Hashable};
 use crate::types::block_buffer::BlockBuffer;
 use crate::Blockchain; 
+use std::os::linux::raw;
 use std::sync::{Arc, Mutex};
 use log::{debug, warn, error};
 
@@ -101,7 +102,6 @@ impl Worker {
                         continue;
                     }
                     debug!("Blocks: {:?}", input_blocks);
-                    //should verify the block in the future 
                     //remove duplicated blocks which we already have
                     let mut blocks_I_dont_have = Vec::new();
                     let mut orphan_blocks = Vec::new(); 

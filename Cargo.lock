@@ -170,6 +170,7 @@ version = "0.1.0"
 dependencies = [
  "async-dup",
  "bincode",
+ "chrono",
  "clap",
  "crossbeam",
  "futures",

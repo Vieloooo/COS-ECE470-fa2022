@@ -42,14 +42,15 @@ impl Worker {
             let _block = self.finished_block_chan.recv().expect("Receive finished block error");
             // TODO for student: insert this finished block to blockchain, and broadcast this block hash
             // update the blockchain 
-            //let mut blockchain = self.blockchain.lock().unwrap();
-            //blockchain.insert(&_block);
-            debug!("Insert a mined block {:?} to blockchain", _block.hash());
+            let mut blockchain = self.blockchain.lock().unwrap();
+            blockchain.insert(&_block);
+            info!("Insert a mined block {:?} to blockchain", _block.hash());
             //broadcast 
             let mut new_blocks = Vec::new();
             new_blocks.push(_block.hash());
             self.server.broadcast(message::Message::NewBlockHashes(new_blocks));
             debug!("Broadcast a new block hash {:?} to peers", _block.hash());
+
         }
     }
 }
