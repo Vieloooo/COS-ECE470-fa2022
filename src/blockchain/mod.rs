@@ -1,6 +1,7 @@
 use crate::types::block::{self, Block};
 use crate::types::hash::{Hashable, H256};
 use std::collections::HashMap;
+const K: u32= 6;
 pub struct BlockWithHeight {
     pub block: Block,
     ///height is useful when handling uncle blocks
@@ -95,6 +96,20 @@ impl Blockchain {
         while block_hash != H256::default() {
             blocks.push(block_hash);
             block_hash = self.blocks.get(&block_hash).unwrap().block.get_parent();
+        }
+        // reverse the blocks
+        blocks.reverse();
+        blocks
+    }
+    pub fn get_all_blocks_from_genesis_to_finialized(&self) -> Vec<Block> {
+        let mut blocks = vec![];
+        let mut block_hash = self.tail_block;
+        let mut block_height = self.height;
+        while block_height > 0 {
+            let mut bblock = self.blocks.get(&block_hash).unwrap().block.clone();
+            block_hash = bblock.get_parent();
+            blocks.push(bblock);
+            block_height -= 1;
         }
         // reverse the blocks
         blocks.reverse();

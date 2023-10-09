@@ -14,6 +14,16 @@ pub trait Hashable {
 #[derive(Eq, PartialEq, Serialize, Deserialize, Clone, Hash, Default, Copy)]
 pub struct H256(pub [u8; 32]); // big endian u256
 
+impl H256 {
+    /// gen a random hash 
+    pub fn rand() -> H256{
+        let mut rng = rand::thread_rng();
+        let random_bytes: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
+        let mut raw_bytes = [0; 32];
+        raw_bytes.copy_from_slice(&random_bytes);
+        (&raw_bytes).into()
+    }
+}
 impl Hashable for H256 {
     fn hash(&self) -> H256 {
         ring::digest::digest(&ring::digest::SHA256, &self.0).into()

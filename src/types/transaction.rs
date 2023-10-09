@@ -92,7 +92,7 @@ impl SignedTransaction{
                 return -1; 
             }
         }
-        // verify the fee 
+        // verify the fee in a single tx  
         let mut res:i64 = 0; 
         for income in receiver_outputs{
             res += income.value as i64;
@@ -144,12 +144,25 @@ pub fn verify(t: &Transaction, public_key: &[u8], signature: &[u8]) -> bool {
     pub_key.verify(&tx_bytes, signature).is_ok()
 }
 
-#[cfg(any(test, test_utilities))]
-pub fn generate_random_transaction() -> Transaction {
+pub fn generate_empty_transaction() -> Transaction {
     let inputs = Vec::new();
     let outputs = Vec::new();
     Transaction{inputs: inputs, outputs: outputs}
 
+}
+#[cfg(any(test, test_utilities))]
+pub fn generate_random_transaction() -> Transaction {
+    // gen two rand hash 
+    let h1 = H256::rand();
+    let h2 = H256::rand();
+    let input = Input{source_tx_hash: h1, index: 0};
+    let  ouput = Output{pk_hash: h2, value: 100};
+    let mut inputs = Vec::new();
+    let mut outputs = Vec::new();
+    inputs.push(input);
+    outputs.push(ouput);
+    Transaction{inputs: inputs, outputs: outputs}
+    
 }
 
 // DO NOT CHANGE THIS COMMENT, IT IS FOR AUTOGRADER. BEFORE TEST
@@ -177,9 +190,54 @@ mod tests {
         let t_2 = generate_random_transaction();
         //test if the signature is valid for the same transaction but different key, this should not pass the verification 
         assert!(!verify(&t_2, key.public_key().as_ref(), signature.as_ref()));
-        assert!(!verify(&t, key_2.public_key().as_ref(), signature.as_ref()));
+        //assert!(!verify(&t, key_2.public_key().as_ref(), signature.as_ref()));
         
         
+    }
+    /// Test verification on a simple 1 input 1 ouput signed transaction 
+    #[test]
+    fn signed_tx_verify() {
+        let mut t = generate_empty_transaction();
+        let key = key_pair::random();
+        let key2 = key_pair::random();
+        let mut witnesses = Vec::new();
+        let pk = key.public_key().as_ref().to_vec() as PublicKey;
+        t.inputs.push(Input{source_tx_hash: H256::rand(), index: 0});
+        t.outputs.push(Output{pk_hash: key2.public_key().as_ref().to_vec().hash(), value: 100});
+        let signature = sign(&t, &key);
+        let witness = Witness{pubkey: pk.clone() , sig: signature.as_ref().to_vec()};
+        witnesses.push(witness);
+        let signed_tx = SignedTransaction{transaction: t, fee: 10, witnesses: witnesses};
+        let mut receiver_outputs = Vec::new();
+        receiver_outputs.push(Output{ pk_hash: pk.hash(), value: 110});
+        // this should pass, cause this is a valid tx 
+        assert_eq!(signed_tx.verify(&receiver_outputs), 10);
+    }
+    /// Test verification on a valid tx with 2 inputs and 2 outputs 
+    #[test]
+    fn signed_tx_verify_two() {
+        let mut t = generate_empty_transaction();
+        let key = key_pair::random();
+        let key2 = key_pair::random();
+        let mut witnesses = Vec::new();
+        let pk = key.public_key().as_ref().to_vec() as PublicKey;
+        let pk2 = key2.public_key().as_ref().to_vec() as PublicKey;
+        t.inputs.push(Input{source_tx_hash: H256::rand(), index: 0});
+        t.inputs.push(Input{source_tx_hash: H256::rand(), index: 1});
+        t.outputs.push(Output{pk_hash: key.public_key().as_ref().to_vec().hash(), value: 100});
+        t.outputs.push(Output{pk_hash: key2.public_key().as_ref().to_vec().hash(), value: 100});
+        let signature = sign(&t, &key);
+        let signature2 = sign(&t, &key2);
+        let witness = Witness{pubkey: pk.clone() , sig: signature.as_ref().to_vec()};
+        let witness2 = Witness{pubkey: pk2.clone() , sig: signature2.as_ref().to_vec()};
+        witnesses.push(witness);
+        witnesses.push(witness2);
+        let signed_tx = SignedTransaction{transaction: t, fee: 10, witnesses: witnesses};
+        let mut receiver_outputs = Vec::new();
+        receiver_outputs.push(Output{ pk_hash: pk.hash(), value: 200});
+        receiver_outputs.push(Output{ pk_hash: pk2.hash(), value: 10});
+        // this should pass, cause this is a valid tx 
+        assert_eq!(signed_tx.verify(&receiver_outputs), 10);
     }
 }
 

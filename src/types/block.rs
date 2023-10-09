@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 use crate::types::hash::{H256, Hashable };
-use super::transaction::SignedTransaction;
+use super::{transaction::SignedTransaction, merkle::MerkleTree};
 use rand::prelude::*;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -60,6 +60,18 @@ impl Block {
         }
         gb
     }
+    // gen a new block with 0 nounce 
+    pub fn new_block_from_txs(parent: &H256, txs: &Vec<SignedTransaction>) -> Block{
+        let body = Body {
+            tx_count: txs.len(),
+            txs: txs.clone(),
+        };
+        let mut header = generate_random_header(parent);
+        header.nonce = 0; 
+        let merkle_tree = MerkleTree::new(&body.txs);
+        header.merkle_root = merkle_tree.root();
+        Block { header: header, body: body }
+    }
 }
 fn generate_genesis_header() -> Header{
     // generate a 256 bits byte list with 16 bits zero, rest 1 
@@ -86,8 +98,7 @@ pub fn generate_random_header(parent: &H256) -> Header{
     for i in 2..32 {
         difficulty.0[i] = 255;
     }
-    // make the first 8 bits in difficulty zero 
-    difficulty.0[0] = 0;
+
     // nounce should be a random u32 using crate ring 
     let mut rng = rand::thread_rng();
     let nounce = rng.gen::<u32>();
