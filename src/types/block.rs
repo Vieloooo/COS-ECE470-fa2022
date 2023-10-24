@@ -1,8 +1,8 @@
 use serde::{Serialize, Deserialize};
-use crate::types::hash::{H256, Hashable };
-use super::{transaction::SignedTransaction, merkle::MerkleTree};
+use crate::types::{hash::{H256, Hashable }, transaction::Transaction};
+use super::{transaction::{SignedTransaction, Output}, merkle::MerkleTree, key_pair::PublicKey};
 use rand::prelude::*;
-
+use super::ico::IcoGenerator;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Header {
     /// prev block hash 
@@ -49,7 +49,7 @@ impl Block {
     }
     /// genesis will return a static block 
     pub fn genesis() -> Block{
-        let body = generate_empty_body();
+        let body = generate_ico_body();
         let header = generate_genesis_header();
         let mut gb = Block { header: header, body: body }; 
         loop {
@@ -115,10 +115,29 @@ pub fn generate_random_header(parent: &H256) -> Header{
 
 
 pub fn generate_empty_body() -> Body {
-    //unimplemented!()
     Body {
         tx_count: 0,
         txs: Vec::new(),
+    }
+}
+// generate a body with init ico utxo, this will be used in genesis block 
+pub fn generate_ico_body() -> Body {
+    use ring::signature::KeyPair;
+    let mut ico = IcoGenerator::load_key("./keys");
+    // generate a tx with 0 input and 3 output, each 1000,000 btc
+    // construct the output 
+    let mut outputs:Vec<Output> = Vec::new();
+    for i in 0..3 {
+        let pk: PublicKey = ico[i].public_key().as_ref().to_vec();
+        let pk_hash = pk.hash();
+        let output = Output{pk_hash: pk_hash, value: 1000000};
+        outputs.push(output);
+    }
+    let ico_tx = Transaction{inputs: Vec::new(), outputs: outputs};
+    let signed_ico_tx = SignedTransaction{transaction: ico_tx, fee: 0, witnesses: Vec::new()};
+    Body{
+        tx_count:1, 
+        txs: vec![signed_ico_tx],
     }
 }
 

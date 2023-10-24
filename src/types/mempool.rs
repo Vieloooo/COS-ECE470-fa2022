@@ -8,6 +8,7 @@ pub struct Mempool {
     pub txs: Vec<SignedTransaction>,
     // utxo, this utxo is aligned with the finialized block and current mempool txs 
     pub utxo: HashMap<(H256, usize), UTXO>,
+    pub synced_block_height: u32,
 }
 
 pub struct UTXO{
@@ -20,13 +21,14 @@ impl Mempool {
         Mempool {
             txs: Vec::new(),
             utxo: HashMap::new(),
+            synced_block_height: 0, 
         }
     }
     /// a back-door function for test and genesis initaliation
-    pub fn add_utxo(&mut self, key: (H256, usize), utxo: UTXO) {
+    pub fn add_utxo(&mut self, key: (H256, usize), utxo:  UTXO) {
         self.utxo.insert(key, utxo);
     }
-    /// get the corespoinding output for the tx from utxo 
+    /// get the correspoinding output for the tx from utxo 
     pub fn get_utxo(&self, tx: &SignedTransaction) -> Result< Vec<Output>, String> {
         let mut outputs = Vec::new();
         for input in &tx.transaction.inputs {
@@ -73,6 +75,7 @@ impl Mempool {
         for tx in &self.txs {
             total_fee += tx.fee;
         }
+        // add a coin  base which containts all tx fee + a fixed reward
         // build a merkle tree for the txs
         let merkle_tree = MerkleTree::new(&self.txs);
         let merkle_root = merkle_tree.root();
@@ -114,6 +117,7 @@ impl Mempool {
             }
         }
         self.check_mempool();
+        self.synced_block_height += 1; 
         Ok(())
     }
     /// check every tx in the mempool, if the tx is not valid, remove it, and set the utxo used_in_mempool flag to false

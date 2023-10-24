@@ -8,7 +8,7 @@ use crate::Blockchain;
 use std::os::linux::raw;
 use std::sync::{Arc, Mutex};
 use log::{debug, warn, error};
-
+use crate::types::mempool::Mempool;
 use std::thread;
 
 #[cfg(any(test,test_utilities))]
@@ -22,6 +22,7 @@ pub struct Worker {
     server: ServerHandle,
     blockchain: Arc<Mutex<Blockchain>>,
     block_buffer: Arc<Mutex<BlockBuffer>>, 
+    mempool: Arc<Mutex<Mempool>>,
 }
 
 
@@ -32,6 +33,7 @@ impl Worker {
         server: &ServerHandle,
         _blockchain: &Arc<Mutex<Blockchain>>,
         _block_buffer: &Arc<Mutex<BlockBuffer>>,
+        _mempool: &Arc<Mutex<Mempool>>,
     ) -> Self {
         Self {
             msg_chan: msg_src,
@@ -39,6 +41,7 @@ impl Worker {
             server: server.clone(),
             blockchain: Arc::clone(_blockchain),
             block_buffer: Arc::clone(_block_buffer),  
+            mempool: Arc::clone(_mempool),
         }
     }
 
@@ -71,6 +74,8 @@ impl Worker {
                 Message::Pong(nonce) => {
                     debug!("Pong: {}", nonce);
                 }
+                // receive other nodes' new block hashes. 
+                // if I don't have the block, send a request to get the block
                 Message::NewBlockHashes(hashes) => {
                     if hashes.is_empty(){
                         continue;
@@ -102,6 +107,12 @@ impl Worker {
                         continue;
                     }
                     debug!("Blocks: {:?}", input_blocks);
+                    // filter the input blocks, remove the under_mined blocks
+                    // get current difficulty
+                    let dif = self.blockchain.lock().unwrap().get_difficulty();
+                    let mut input_blocks = input_blocks;
+                    input_blocks.retain(|block| block.header.difficulty >= dif);
+                    
                     //remove duplicated blocks which we already have
                     let mut blocks_I_dont_have = Vec::new();
                     let mut orphan_blocks = Vec::new(); 
@@ -120,7 +131,7 @@ impl Worker {
                     for block in blocks_I_dont_have {
                         // In this working thread, only have 1 working loop and 1 buffer, so buffer can borrow the blockchain, no need for clone  
                         let parent_hash = block.header.parent; 
-                        let have_parents = self.block_buffer.lock().unwrap().send_block(block, &self.blockchain);
+                        let have_parents = self.block_buffer.lock().unwrap().send_block(block, &self.blockchain, &self.mempool);
 
                         // if the newcoming block is an orphan block, send a request to get the parent block
                         if !have_parents {
@@ -165,7 +176,8 @@ fn generate_test_worker_and_start() -> (TestMsgSender, ServerTestReceiver, Vec<H
     let (test_msg_sender, msg_chan) = TestMsgSender::new();
     let blockchain = Arc::new(Mutex::new(Blockchain::new()));
     let block_buffer = Arc::new(Mutex::new(BlockBuffer::new()));
-    let worker = Worker::new(1, msg_chan, &server, &blockchain, &block_buffer);
+    let mempool = Arc::new(Mutex::new(Mempool::new()));
+    let worker = Worker::new(1, msg_chan, &server, &blockchain, &block_buffer, &mempool);
     let init_hash = blockchain.lock().unwrap().tip();
     worker.start(); 
     (test_msg_sender, server_receiver, vec![init_hash])

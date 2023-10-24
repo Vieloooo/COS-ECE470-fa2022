@@ -6,3 +6,5 @@ pub mod key_pair;
 pub mod transaction;
 pub mod block_buffer; 
 pub mod mempool;
+pub mod transaction_generator;
+pub mod ico; 

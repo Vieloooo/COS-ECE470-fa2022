@@ -13,12 +13,18 @@ use clap::clap_app;
 use smol::channel;
 use log::{error, info};
 use api::Server as ApiServer;
+use types::mempool;
 use std::net;
 use std::process;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time;
 use crate::types::block_buffer::BlockBuffer; 
+use crate::types::transaction::Output;
+use crate::types::block::Block;
+use crate::types::hash::{H256, Hashable};
+use crate::types::mempool::{UTXO, Mempool};
+use crate::types::key_pair; 
 fn main() {
     // parse command line arguments
     let matches = clap_app!(Bitcoin =>
@@ -36,8 +42,23 @@ fn main() {
     let verbosity = matches.occurrences_of("verbose") as usize;
     stderrlog::new().verbosity(verbosity).init().unwrap();
     let blockchain = Blockchain::new();
+    // init the genesis process 
     let blockchain = Arc::new(Mutex::new(blockchain));
     let block_buffer = Arc::new(Mutex::new(BlockBuffer::new()));
+    let mempool = Arc::new(Mutex::new(Mempool::new()));
+    // get genesis outputs from the genesis block
+    let genesis_block = blockchain.lock().unwrap().get_all_blocks_from_genesis_to_finialized()[0].clone();
+    // extract utxos from genesis_block
+    let genesis_utxo = &genesis_block.body.txs[0].transaction.outputs;
+    // add utxos to mempool
+    let genesis_hash = genesis_block.hash();
+    let mut i = 0; 
+    for utxo in genesis_utxo {
+        mempool.lock().unwrap().add_utxo((genesis_hash, i), UTXO {output: utxo.clone(), used_in_mempool: false});
+        i= i + 1; 
+    }
+    // init a new keypair for this block 
+    let mykey = key_pair::random(); 
     // parse p2p server address
     let p2p_addr = matches
         .value_of("peer_addr")
@@ -65,7 +86,7 @@ fn main() {
     let (server_ctx, server) = network::server::new(p2p_addr, msg_tx).unwrap();
     server_ctx.start().unwrap();
 
-    // start the worker
+    // start the network msg handle worker
     let p2p_workers = matches
         .value_of("p2p_workers")
         .unwrap()
@@ -80,13 +101,16 @@ fn main() {
         &server,
         &blockchain,
         &block_buffer,
+        &mempool,
     );
+    // p2p network worker, handle all the network messages and update the blockchain
     worker_ctx.start();
 
     // start the miner
     // The miner thread will manage the block update and mining process
-    let (miner_ctx, miner, finished_block_chan) = miner::new(&blockchain);
-    let miner_worker_ctx = miner::worker::Worker::new(&server, finished_block_chan, &blockchain);
+    let (miner_ctx, miner, finished_block_chan) = miner::new(&blockchain, &mempool);
+    let miner_worker_ctx = miner::worker::Worker::new(&server, finished_block_chan, &blockchain, &mempool);
+    // miner main process, just mine a new block and propose to mine worker
     miner_ctx.start();
     miner_worker_ctx.start();
 

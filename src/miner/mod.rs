@@ -11,7 +11,8 @@ use crate::types::hash::{Hashable, H256};
 use crate::types::block::Block;
 use crate::Blockchain;
 use crate::types::block::generate_random_block;
-
+use crate::types::mempool::Mempool;
+use crate::types::block;
 enum ControlSignal {
     Start(u64), // the number controls the lambda of interval between block generation
     Update, // update the block in mining, it may due to new blockchain tip or new transaction
@@ -33,6 +34,8 @@ pub struct Context {
     blockchain: Arc<Mutex<Blockchain>>,
     // lastest block hash 
     last_block_hash: H256,
+    //mempool 
+    mempool: Arc<Mutex<Mempool>>,
 }
 
 #[derive(Clone)]
@@ -41,7 +44,7 @@ pub struct Handle {
     control_chan: Sender<ControlSignal>,
 }
 
-pub fn new(blockchain:&Arc<Mutex<Blockchain>> ) -> (Context, Handle, Receiver<Block>) {
+pub fn new(blockchain:&Arc<Mutex<Blockchain>>, mempool: &Arc<Mutex<Mempool>> ) -> (Context, Handle, Receiver<Block>) {
     // api_server => miner_thread 
     let (signal_chan_sender, signal_chan_receiver) = unbounded();
     // miner_thread => miner_worker_thread 
@@ -52,6 +55,7 @@ pub fn new(blockchain:&Arc<Mutex<Blockchain>> ) -> (Context, Handle, Receiver<Bl
         finished_block_chan: finished_block_sender,
         blockchain:Arc::clone(blockchain),
         last_block_hash: blockchain.lock().unwrap().tip(),
+        mempool: Arc::clone(mempool),
     };
     //a sender abstraction for control signal from api server 
     let handle = Handle {
@@ -64,8 +68,9 @@ pub fn new(blockchain:&Arc<Mutex<Blockchain>> ) -> (Context, Handle, Receiver<Bl
 #[cfg(any(test,test_utilities))]
 fn test_new() -> (Context, Handle, Receiver<Block>) {
    let blockchain = Arc::new(Mutex::new(Blockchain::new()));
+   let mempool = Arc::new(Mutex::new(Mempool::new()));
    println!("The genesis hash is {:?}", blockchain.lock().unwrap().tip());
-   new(&blockchain)
+   new(&blockchain, &mempool)
    
 }
 
@@ -124,7 +129,7 @@ impl Context {
                 OperatingState::ShutDown => {
                     return;
                 }
-                
+                // working state
                 _ => match self.control_chan.try_recv() {
                     Ok(signal) => {
                         match signal {
@@ -147,22 +152,29 @@ impl Context {
                     Err(TryRecvError::Disconnected) => panic!("Miner control channel detached"),
                 },
             }
+
             if let OperatingState::ShutDown = self.operating_state {
                 return;
             }
 
             // TODO for student: actual mining, create a block 
-            let mut difficulty = H256::default(); 
-            //get the last hash and difficulty of the blockchain
+            let difficulty: H256;
             {
+            //get the last hash and difficulty of the blockchain
             self.last_block_hash = self.blockchain.lock().unwrap().tip();
             difficulty = self.blockchain.lock().unwrap().get_difficulty(); 
             }
             debug!("Start mining a block from {:?}", self.last_block_hash); 
-            let mut new_block = generate_random_block(&self.last_block_hash);
-            new_block.header.nonce = 0;
+            let mut new_block: Block; 
+            // get the new block from mempool 
+            let (new_body, mr, fee) = self.mempool.lock().unwrap().propose_block_body(); 
+            
             //get the difficulty of the tip
-            new_block.header.difficulty = difficulty; 
+            let mut new_header = block::generate_random_header(&self.last_block_hash);
+            
+            new_header.difficulty = difficulty;
+            new_header.merkle_root = mr;
+            new_block = Block{header: new_header, body: new_body};
             // range nounce from 0 to u32::max_value()
             loop {
                 if new_block.hash() < new_block.header.difficulty {
