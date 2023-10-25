@@ -24,8 +24,9 @@ An minimalistic bitcoin-like blockchain implemented in Rust:
     }
 ```
 - K blocks confirmation
-
+- tx fee verification 
 Todos: 
+- [ ] add coinbase 
 - [ ] CLI wallet which manage the keys and construct transactions
 - [ ] user-chain Test 
 - [ ] Doc
