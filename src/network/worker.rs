@@ -145,6 +145,50 @@ impl Worker {
                     }
                     // boardcast new incoming blocks that I not have 
                 }
+                Message::NewTransactionHashes(hashes) => {
+                    if hashes.is_empty(){
+                        continue;
+                    }
+                    debug!("NewTransactionHashes: {:?}", hashes);
+                    let mut txs_I_dont_have = Vec::new();
+                    let txs= & self.mempool.lock().unwrap().txs; 
+                    let mut txs_hash = Vec::new();
+                    for tx in txs {
+                        txs_hash.push(tx.get_tx_hash().clone());
+                    }
+                    for hash in hashes {
+                        if !txs_hash.contains(&hash) {
+                            txs_I_dont_have.push(hash.clone());
+                        }
+                    }
+                    peer.write(Message::GetTransactions(txs_I_dont_have));
+                }
+                Message::GetTransactions(hashes) => {
+                    if hashes.is_empty(){
+                        continue;
+                    }
+                    debug!("GetTransactions: {:?}", hashes);
+                    let mut txs = Vec::new();
+                    let mempool = self.mempool.lock().unwrap();
+                    for tx in mempool.txs.iter() {
+                        if hashes.contains(&tx.get_tx_hash()) {
+                            txs.push(tx.clone());
+                        }
+                    }
+                    peer.write(Message::Transactions(txs));
+                }
+                Message::Transactions(input_txs) => {
+                    if input_txs.is_empty(){
+                        continue;
+                    }
+                    debug!("Transactions: {:?}", input_txs);
+                    for tx in input_txs {
+                        let res = self.mempool.lock().unwrap().add_tx(&tx);
+                        if res.is_err() {
+                            warn!("add tx failed");
+                        }
+                    }
+                }
                 _ => unimplemented!(),
             }
         }

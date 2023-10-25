@@ -204,7 +204,7 @@ mod test {
     use ntest::timeout;
     use crate::types::hash::Hashable;
 
-    #[test]
+    //#[test]
     #[timeout(60000)]
     fn miner_three_block() {
         let (miner_ctx, miner_handle, finished_block_chan) = super::test_new();

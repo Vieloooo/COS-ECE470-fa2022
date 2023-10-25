@@ -101,7 +101,6 @@ impl Blockchain {
                         // update the finalized block
                         self.finalized_block = new_finalized_block;
                         okk = true; 
-                        return (okk, self.finalized_block) 
                     }else{
                         self.finalized_block = new_finalized_block;
                     }
@@ -140,8 +139,8 @@ impl Blockchain {
     pub fn get_all_blocks_from_genesis_to_finialized(&self) -> Vec<Block> {
         let mut blocks = vec![];
         let mut block_hash = self.tail_block;
-        let mut block_height = self.height;
-        while block_height > 0 {
+        let mut block_height: i64 = self.height as i64;
+        while block_height >= 0 {
             let  bblock = self.blocks.get(&block_hash).unwrap().block.clone();
             block_hash = bblock.get_parent();
             blocks.push(bblock);
@@ -209,13 +208,21 @@ mod tests {
         assert_eq!(blocks.len(), 5);
     }
     #[test]
-    fn test_genesis(){
+    fn test_genesis_consistency(){
         // test genesis block
         let b1 = Block::genesis();
         let b2 = Block::genesis(); 
         let b3 = Block::genesis();
         assert_eq!(b1.hash(), b2.hash());
         assert_eq!(b1.hash(), b3.hash());
+    }
+    #[test]
+    fn test_genesis_block(){
+        let blockchain = Blockchain::new();
+        let genesis = blockchain.get_all_blocks_from_genesis_to_finialized().clone(); 
+        println!("block tail {:?}", blockchain.tip());
+        println!("genesis block: {:?}", genesis);
+
     }
 }
 

@@ -58,7 +58,7 @@ fn main() {
         i= i + 1; 
     }
     // init a new keypair for this block 
-    let mykey = key_pair::random(); 
+    //let mykey = key_pair::random(); 
     // parse p2p server address
     let p2p_addr = matches
         .value_of("peer_addr")
@@ -149,11 +149,13 @@ fn main() {
 
 
     // start the API server
+
     ApiServer::start(
         api_addr,
         &miner,
         &server,
         &blockchain,
+        &mempool, 
     );
 
     loop {

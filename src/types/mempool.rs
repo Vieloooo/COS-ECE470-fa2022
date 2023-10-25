@@ -10,7 +10,7 @@ pub struct Mempool {
     pub utxo: HashMap<(H256, usize), UTXO>,
     pub synced_block_height: u32,
 }
-
+#[derive(Debug, Clone)]
 pub struct UTXO{
     pub output: Output,
     /// if the state = false, means the utxo is not used from the mempool pending tx, if the state = true, means the utxo is used from the mempool pending tx
@@ -47,6 +47,12 @@ impl Mempool {
     }
     /// add a tx to the mempool 
     pub fn add_tx(&mut self, tx: &SignedTransaction) -> Result<(), String> {
+        // check if the tx is already in the mempool
+        for tx_in_mempool in &self.txs {
+            if tx_in_mempool.get_tx_hash() == tx.get_tx_hash() {
+                return Err("The tx is already in the mempool".to_string());
+            }
+        }
         //get utxo for the tx
         let outputs = self.get_utxo(tx)?;
         // check if the tx is valid

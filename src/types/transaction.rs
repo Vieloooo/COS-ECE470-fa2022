@@ -36,6 +36,12 @@ pub struct Output{
     pub pk_hash: H256, 
     pub value: u64,
 }
+
+impl std::fmt::Display for Output{
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "pk_hash: {}, value: {}", self.pk_hash, self.value)
+    }
+}
 /// witness 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Witness{
