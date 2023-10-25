@@ -1,3 +1,5 @@
 /node/target/
 /wallet/target/
 .vscode/
+/node/bitcoin
+/wallet/wallet

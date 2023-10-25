@@ -25,7 +25,6 @@ clap = { version = "2.33", features = ["wrap_help"]}
 chrono = "0.4"
 ureq = "2.2.0"
 
-
 [features]
 default = []
 test-utilities = []
