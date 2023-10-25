@@ -32,5 +32,5 @@ Todos:
 - [ ] Doc
 
 
-> This repo is fork from the repository for COS/ECE 470: Principles of Blockchains, Fall 2022 at Princeton University. [Main website of the course](https://blockchains.princeton.edu/principles-of-blockchains/).
+> This repo is fork from the repository for COS/ECE 470: Principles of Blockchains, Fall 2022 at Princeton University. 
 
