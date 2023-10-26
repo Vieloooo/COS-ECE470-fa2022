@@ -2,7 +2,7 @@
 
 An minimalistic bitcoin-like blockchain implemented in Rust: 
 
-- Segwit UTXO model, which implement P2PWPKH-like payment. The input redeem code `pk, sig` are moved in witness. 
+- Segwit UTXO model, which implement P2PWPKH-like payment. The input redeem code `pk, sig` are moved to the witness part. 
 ```Rust 
     pub struct SignedTransaction {
         /// Transaction
@@ -23,14 +23,70 @@ An minimalistic bitcoin-like blockchain implemented in Rust:
         pub sig: Vec<u8>
     }
 ```
-- K blocks confirmation
-- tx fee verification 
+- K-block confirmation/finalization. 
+- Mempool are finialized blocks are consistant. 
+
+## Usage 
+
+Build project: in `/wallet` and `/node` directory, run `bash build.sh`
+
+Using wallet: run `./wallet --help`
+```
+RBTC Wallet 0.1.0
+PlasticBug
+Check you account and tranfer your RBTC!
+
+USAGE:
+    wallet [OPTIONS] [SUBCOMMAND]
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+OPTIONS:
+    -a, --address <ADDRESS>    Sets the server address [default:
+                               http://127.0.0.1:7000]
+    -k, --key <FILE>           Sets the key file [default: ../keys/alice.key]
+    -n, --neighbors <FILE>     Sets the neighbors file [default: ../pks.txt]
+
+SUBCOMMANDS:
+    help                Prints this message or the help of the given
+                        subcommand(s)
+    show_utxo_detail    Shows UTXO details
+    transfer            Transfers x RBTC to pkh
+    transfer_by_id      Transfers RBTC to an neighbor with index i
+```
+
+Launching node: run `./bitcoin --help`
+
+```
+$ ./bitcoin --help
+RBTC 0.1
+minalistic UTXO Blockchin in Rust
+
+USAGE:
+    bitcoin [FLAGS] [OPTIONS]
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+    -v               Increases the verbosity of logging
+
+OPTIONS:
+        --api <ADDR>           Sets the IP address and the port of the API server
+                               [default: 127.0.0.1:7000]
+    -c, --connect <PEER>...    Sets the peers to connect to at start
+        --p2p-workers <INT>    Sets the number of worker threads for P2P server
+                               [default: 4]
+        --p2p <ADDR>           Sets the IP address and the port of the P2P server
+                               [default: 127.0.0.1:6000]
+```
+
+
 Todos: 
+
 - [ ] add coinbase 
-- [ ] CLI wallet which manage the keys and construct transactions
-- [ ] user-chain Test 
-- [ ] Doc
 
 
-> This repo is fork from the repository for COS/ECE 470: Principles of Blockchains, Fall 2022 at Princeton University. 
+> This repo is fork from the [project repository](https://github.com/Blockchains-Princeton/COS-ECE470-fa2022) for the course COS/ECE 470: Principles of Blockchains, Fall 2022 at Princeton University. 
 

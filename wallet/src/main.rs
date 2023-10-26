@@ -194,12 +194,6 @@ fn main() {
                 pk_hash: to_pkh,
                 value: amount,
             };
-            // make a charge output 
-            let fee :u64 = 1; 
-            let charge_output = Output{
-                pk_hash: wallet.pkh,
-                value: wallet.balance - amount - fee,
-            };
             // make input
             // range current utxo, add them to input list until the sum of input is larger than amount
             let mut inputs: Vec<transaction::Input> = Vec::new();
