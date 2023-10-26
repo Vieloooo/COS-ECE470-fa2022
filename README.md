@@ -30,6 +30,9 @@ An minimalistic bitcoin-like blockchain implemented in Rust:
 
 Build project: in `/wallet` and `/node` directory, run `bash build.sh`
 
+Setup keypairs: 
+- store your Ed25519 keys in `Document` [bytes](https://docs.rs/ring/latest/ring/signature/struct.Ed25519KeyPair.html). The test keys are stored in `/keys`.
+- store the test public key hashes in `/pks.txt`,which provide quick pkh query. No need for typing the pkh in terminal again.  
 Using wallet: run `./wallet --help`
 ```
 RBTC Wallet 0.1.0
@@ -81,6 +84,13 @@ OPTIONS:
         --p2p <ADDR>           Sets the IP address and the port of the P2P server
                                [default: 127.0.0.1:6000]
 ```
+## Tests
+- Run uni-tests for node, run `cargo test`
+- Run multi-node test
+  - launch 3 nodes 
+  - in `/tests`` dir, run all 3 `a2b.sh`, `b2c.sh`, `c2d.sh` files in 3 terminal. 
+  - check the consistency of the finalized block of the three nodes. 
+
 
 
 Todos: 
