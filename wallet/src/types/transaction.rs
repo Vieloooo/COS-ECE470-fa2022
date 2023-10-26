@@ -70,7 +70,7 @@ pub struct SignedTransaction {
     /// Transaction
     pub transaction: Transaction,
     /// Tx fee = sum input - sum outputs 
-    pub fee: u32, 
+    pub fee: u64, 
     /// sigature list for each input 
     pub witnesses: Vec<Witness>,
 }

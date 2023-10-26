@@ -15,6 +15,7 @@ use tiny_http::Server as HTTPServer;
 use url::Url;
 use crate::types::block::{Block, Body};
 use crate::types::mempool::{Mempool, self};
+use crate::types::transaction::SignedTransaction;
 pub struct Server {
     handle: HTTPServer,
     miner: MinerHandle,
@@ -67,7 +68,7 @@ impl Server {
             mempool: Arc::clone(mempool),
         };
         thread::spawn(move || {
-            for req in server.handle.incoming_requests() {
+            for mut req in server.handle.incoming_requests() {
                 let miner = server.miner.clone();
                 let network = server.network.clone();
                 let blockchain = Arc::clone(&server.blockchain);
@@ -126,6 +127,10 @@ impl Server {
                             let height = blockchain.lock().unwrap().height; 
                             respond_json!(req, height);
                         }
+                        "/blockchain/total_block" => {
+                            let n = blockchain.lock().unwrap().blocks.len(); 
+                            respond_json!(req, n); 
+                        }
                         "/blockchain/longest-chain-tx" => {
                             let blockchain = blockchain.lock().unwrap();
                             let all_blocks_hash = blockchain.all_blocks_in_longest_chain();
@@ -156,11 +161,20 @@ impl Server {
                             let mempool = mempool.lock().unwrap();
                             let mut utxo_list = Vec::new(); 
                             for (k, v) in mempool.utxo.clone(){
-                                let otxo_string = format!("{:.8}-{:.2} => {:.8}:{}", k.0, k.1, v.output.pk_hash, v.output.value);
+                                let otxo_string = format!("{:.8}-{:.2} => {:.8}:{}:{}", k.0, k.1, v.output.pk_hash, v.output.value, v.used_in_mempool);
 
                                 utxo_list.push(otxo_string);
                             }
                             respond_json!(req, utxo_list);
+                        }
+                        "/mempool/txs" => {
+                            // return all tx in the mempool 
+                            let mempool = mempool.lock().unwrap();
+                            let mut tx_list = Vec::new();
+                            for tx in mempool.txs.clone(){
+                                tx_list.push(tx);
+                            }
+                            respond_json!(req, tx_list);
                         }
                         "/utxo-count" => {
                             let mempool = mempool.lock().unwrap();
@@ -191,14 +205,37 @@ impl Server {
                             let mempool = mempool.lock().unwrap();
                             let mut utxo_list = Vec::new();
                             for (k, v) in mempool.utxo.clone(){
-                                if v.output.pk_hash == pk_hash{
+                                if v.output.pk_hash == pk_hash && v.used_in_mempool == false{
                                     utxo_list.push((k.0, k.1, v.output));
                                 }
                             }
                             //serialize utxo_list into json and return 
                             respond_json!(req, utxo_list);
                         }
-        
+                        "/mempool/submit_tx" => {
+                            // get signed tx from url 
+                            if req.method().as_str() != "POST"{
+                                respond_result!(req, false, "not a post request");
+                                return;
+                            }
+                            // read the body of the request as Signed tx 
+                            let mut content = String::new(); 
+                            req.as_reader().read_to_string(& mut content).unwrap(); 
+                            let signed_tx = serde_json::from_str::<SignedTransaction>(&content).unwrap();
+                           
+                            let mut mempool = mempool.lock().unwrap();
+                            let res = mempool.add_tx(&signed_tx);
+                            match res {
+                                Ok(_) => {
+                                    // broadcast the tx to the network 
+                                    network.broadcast(Message::NewTransactionHashes(vec![signed_tx.get_tx_hash()]));
+                                    respond_result!(req, true, "ok");
+                                }
+                                Err(e) => {
+                                    respond_result!(req, false, format!("error adding tx: {}", e));
+                                }
+                            }
+                        }
                         _ => {
                             let content_type =
                                 "Content-Type: application/json".parse::<Header>().unwrap();

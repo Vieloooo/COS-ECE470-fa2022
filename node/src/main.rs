@@ -45,15 +45,16 @@ fn main() {
     let blockchain = Arc::new(Mutex::new(blockchain));
     let block_buffer = Arc::new(Mutex::new(BlockBuffer::new()));
     let mempool = Arc::new(Mutex::new(Mempool::new()));
+
     // get genesis outputs from the genesis block
     let genesis_block = blockchain.lock().unwrap().get_all_blocks_from_genesis_to_finialized()[0].clone();
     // extract utxos from genesis_block
     let genesis_utxo = &genesis_block.body.txs[0].transaction.outputs;
     // add utxos to mempool
-    let genesis_hash = genesis_block.hash();
+    let genesis_hash = genesis_block.body.txs[0].get_tx_hash(); 
     let mut i = 0; 
     for utxo in genesis_utxo {
-        mempool.lock().unwrap().add_utxo((genesis_hash, i), UTXO {output: utxo.clone(), used_in_mempool: false});
+        mempool.lock().unwrap().add_utxo((genesis_hash, i), UTXO {output: utxo.clone(), used_in_mempool: false, used_height: 0});
         i= i + 1; 
     }
     // init a new keypair for this block 

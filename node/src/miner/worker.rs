@@ -45,13 +45,14 @@ impl Worker {
     fn worker_loop(&self) {
         loop {
             let _block = self.finished_block_chan.recv().expect("Receive finished block error");
-            // TODO for student: insert this finished block to blockchain, and broadcast this block hash
+            /*   
             // update the blockchain 
             let mut blockchain_unlocked = self.blockchain.lock().unwrap();
             //blockchain.insert(&_block);
             let mut unlocked_mempool = self.mempool.lock().unwrap();
             block_buffer::blockchain_insert_with_mempool_atomic(_block.clone(), & mut blockchain_unlocked, & mut unlocked_mempool);
             info!("Insert a mined block {:?} to blockchain", _block.hash());
+            */
             //broadcast 
             let mut new_blocks = Vec::new();
             new_blocks.push(_block.hash());

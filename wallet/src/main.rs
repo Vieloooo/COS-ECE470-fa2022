@@ -9,7 +9,7 @@ use std::path::Path;
 use crate::types::transaction; 
 use ureq; 
 use serde_json; 
-use types::transaction::{Output, Transaction};
+use types::transaction::{Output, Transaction, Input, Witness, SignedTransaction};
 
 use clap::{Arg, App, SubCommand};
 pub struct Wallet{
@@ -19,6 +19,7 @@ pub struct Wallet{
     rpc_addr: String,
     //neighbors pkh 
     neighbors: Vec<H256>, 
+    balance: u64, 
 }
 
 impl Wallet{
@@ -36,6 +37,7 @@ impl Wallet{
             rpc_addr: rpc_addr.to_string(),
             pkh: pkh,
             neighbors:n,
+            balance: 0,
         }
     }
    
@@ -61,6 +63,7 @@ impl Wallet{
         for utxo in &self.my_utxo{
             total_amount += utxo.2.value;
         }
+        self.balance = total_amount;
         println!("Total amount: {}", total_amount);
         //println!("utxos: {:?}", utxos);
         
@@ -79,6 +82,17 @@ impl Wallet{
             self.neighbors.push(pkh);
         }
         println!("neighbors: {:?}", self.neighbors);
+    }
+    pub fn submit_tx(&self, transaction: & transaction::SignedTransaction){
+        // submit a signed transaction to rpc 
+        // the rpc path is rpc_addr + "/mempool/submit_tx"
+        // the rpc return a json object of {status: "ok"} or {status: "error"}
+        // first construct url 
+        let url = self.rpc_addr.clone() + "/mempool/submit_tx";
+        let json = serde_json::to_string(&transaction).unwrap();
+        let response = ureq::post(&url).send_string(&json).unwrap();
+        let resp = response.into_string().unwrap();
+        println!("submit tx response: {}", resp);
     }
 }
 
@@ -155,4 +169,162 @@ fn main() {
     wallet.update_utxo();
     println!("UTXO count: {:?}", wallet.my_utxo.len());
     wallet.load_neighbors(neighbors_file);
+    // Handle subcommands
+    match matches.subcommand() {
+        ("show_utxo_detail", Some(_)) => {
+            // Show UTXO details
+            println!("UTXO details: {:?}", wallet.my_utxo);
+        }
+        ("transfer", Some(transfer_matches)) => {
+            // Transfer
+            let to = transfer_matches.value_of("to").unwrap();
+            let amount = transfer_matches.value_of("amount").unwrap();
+            // covert to to pkh
+            let to_pkh = to.parse::<H256>().unwrap();
+            // covert amount to u64
+            let amount = amount.parse::<u64>().unwrap();
+            // check if amount is valid
+            if amount > wallet.balance{
+                println!("Not enough balance!");
+                return;
+            }
+            // create transaction
+            // make output first 
+            let output = Output{
+                pk_hash: to_pkh,
+                value: amount,
+            };
+            // make a charge output 
+            let fee :u64 = 1; 
+            let charge_output = Output{
+                pk_hash: wallet.pkh,
+                value: wallet.balance - amount - fee,
+            };
+            // make input
+            // range current utxo, add them to input list until the sum of input is larger than amount
+            let mut inputs: Vec<transaction::Input> = Vec::new();
+            let mut sum = 0;
+            
+            for utxo in &wallet.my_utxo{
+                let input = Input{
+                    source_tx_hash: utxo.0,
+                    index: utxo.1,
+                };
+                inputs.push(input);
+                sum += utxo.2.value;
+                if sum > amount{
+                    break;
+                }
+            }
+            // make a charge output 
+            let fee :u64 = 1; 
+            let charge_output = Output{
+                pk_hash: wallet.pkh,
+                value: sum - amount - fee,
+            };
+            //make transaction
+            let tx = Transaction{
+                inputs: inputs,
+                outputs: vec![output, charge_output],
+            };
+            // make signature 
+            let sig = transaction::sign(&tx, & wallet.key);
+            let witness = transaction::Witness{
+                pubkey: wallet.key.public_key().as_ref().to_vec(),
+                sig: sig.as_ref().to_vec(),
+            };
+            let mut wits: Vec<Witness> = Vec::new(); 
+            for _ in 0..tx.inputs.len(){
+                wits.push(witness.clone());
+            }
+            
+            // make signed tx
+            let signed_tx = transaction::SignedTransaction{
+                transaction: tx,
+                fee: 1,
+                witnesses: wits,
+            };
+            
+            // send signed tx to rpc
+            wallet.submit_tx(&signed_tx);
+
+
+
+        }
+        ("transfer_by_id", Some(transfer_matches)) => {
+            // Transfer
+            let to = transfer_matches.value_of("to").unwrap();
+            let amount = transfer_matches.value_of("amount").unwrap();
+            // covert to to index 
+            let to_index = to.parse::<usize>().unwrap();
+            // covert amount to u64
+            let amount = amount.parse::<u64>().unwrap();
+            // check if amount is valid
+            if amount >= wallet.balance{
+                println!("Not enough balance!");
+                return;
+            }
+            // create transaction
+            // make output first 
+            let output = Output{
+                pk_hash: wallet.neighbors[to_index],
+                value: amount,
+            };
+            
+            // make input
+            // range current utxo, add them to input list until the sum of input is larger than amount
+            let mut inputs: Vec<transaction::Input> = Vec::new();
+            let mut sum = 0;
+            
+            for utxo in &wallet.my_utxo{
+                let input = Input{
+                    source_tx_hash: utxo.0,
+                    index: utxo.1,
+                };
+                inputs.push(input);
+                sum += utxo.2.value;
+                if sum > amount{
+                    break;
+                }
+            }
+            // make a charge output 
+            let fee :u64 = 1; 
+            let charge_output = Output{
+                pk_hash: wallet.pkh,
+                value: sum - amount - fee,
+            };
+            //make transaction
+            let tx = Transaction{
+                inputs: inputs,
+                outputs: vec![output, charge_output],
+            };
+            // make signature 
+            let sig = transaction::sign(&tx, & wallet.key);
+            let witness = transaction::Witness{
+                pubkey: wallet.key.public_key().as_ref().to_vec(),
+                sig: sig.as_ref().to_vec(),
+            };
+            let mut wits: Vec<Witness> = Vec::new(); 
+            for _ in 0..tx.inputs.len(){
+                wits.push(witness.clone());
+            }
+            
+            // make signed tx
+            let signed_tx = transaction::SignedTransaction{
+                transaction: tx,
+                fee: 1,
+                witnesses: wits,
+            };
+            //let res = signed_tx.verify()
+            // send signed tx to rpc
+            //println!("My tx is {:?}", signed_tx);
+            wallet.submit_tx(&signed_tx);
+        }
+        _ => {
+            // No subcommand used
+            println!("No subcommand used");
+        }
+    }
+
 }
+

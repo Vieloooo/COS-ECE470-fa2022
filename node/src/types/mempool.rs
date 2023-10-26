@@ -1,6 +1,9 @@
+use log::{info, debug};
+
 use super::block::{Body, Block};
 use super::merkle::MerkleTree;
 use super::transaction::{Transaction, SignedTransaction, Input, Output};
+use crate::blockchain::K;
 use super::hash::{H256, Hashable};
 use std::collections::HashMap;
 pub struct Mempool {
@@ -15,6 +18,7 @@ pub struct UTXO{
     pub output: Output,
     /// if the state = false, means the utxo is not used from the mempool pending tx, if the state = true, means the utxo is used from the mempool pending tx
     pub used_in_mempool: bool,
+    pub used_height: u32, 
 }
 impl Mempool {
     pub fn new() -> Self {
@@ -40,7 +44,7 @@ impl Mempool {
                     }
                     outputs.push(output.output.clone());
                 }
-                None => return Err("No input not in utxo".to_string()),
+                None => return Err("No output in utxo".to_string()),
             }
         }
         Ok(outputs)
@@ -64,14 +68,17 @@ impl Mempool {
             // set the used_in_mempool to true
             let output = self.utxo.get_mut(&(input.source_tx_hash, input.index)).unwrap();
             output.used_in_mempool = true;
+            // This utxo will be used in height = synced_block_height + K + 1 if the tx is added to the finalized chain 
+            output.used_height = self.synced_block_height + K +  1; 
         } 
         //add the tx in txs 
         self.txs.push(tx.clone());
         Ok(())
     }
     /// generate a block body for the miner, return blody, merkle root and total fee 
-    pub fn propose_block_body(&self) -> (Body, H256, u32){
+    pub fn propose_block_body(&mut self) -> (Body, H256, u64){
         //no block size limitation, put all tx in the mempool to next block 
+        debug!("propose {} txs", self.txs.len()); 
         let body = Body{
             tx_count: self.txs.len(),
             txs: self.txs.clone(),
@@ -85,7 +92,11 @@ impl Mempool {
         // build a merkle tree for the txs
         let merkle_tree = MerkleTree::new(&self.txs);
         let merkle_root = merkle_tree.root();
+        // remove all txs 
+        self.txs.clear();
+        //
         (body, merkle_root, total_fee)
+
     }
     /// querying UTXO by public key hash 
     pub fn query_utxo(&self, pk_hash: &H256) -> Vec<Output> {
@@ -95,15 +106,37 @@ impl Mempool {
                 outputs.push(utxo.output.clone());
             }
         }
+        
         outputs
     }
     /// receive a finalized block from the blockchain, update utxo and txs 
     pub fn receive_finalized_block(&mut self, block: &Block) -> Result<(), String> {
+        info!("UPDATE mempool using block {:?}", block.hash());
+
         // remove the tx in the block from the mempool
         for tx in &block.body.txs {
-            self.txs.retain(|x| x.get_tx_hash() != tx.get_tx_hash());
+            self.txs.retain(|x| 
+                if x.get_tx_hash() != tx.get_tx_hash() {
+                    debug!("remove tx from mempool: {:?}", x.get_tx_hash());
+                    true
+                }else{
+                    false
+                }
+            );
         }
-        // update utxo, remove used utxo and add new utxo
+
+        // remove used utxo
+        for tx in &block.body.txs {
+            for input in &tx.transaction.inputs {
+                self.utxo.remove(&(input.source_tx_hash, input.index));
+            }
+        }
+        // set timeout utxo to false 
+        for (_, utxo) in &mut self.utxo {
+            if utxo.used_height < self.synced_block_height {
+                utxo.used_in_mempool = false;
+            }
+        }
         //add new utxo 
         for (_, tx) in block.body.txs.iter().enumerate() {
             // range every output in the tx, add it to the utxo
@@ -112,16 +145,12 @@ impl Mempool {
                 let utxo = UTXO{
                     output: output.clone(),
                     used_in_mempool: false,
+                    used_height: self.synced_block_height,
                 };
                 self.utxo.insert(key, utxo);
             }
         }
-        // remove used utxo
-        for tx in &block.body.txs {
-            for input in &tx.transaction.inputs {
-                self.utxo.remove(&(input.source_tx_hash, input.index));
-            }
-        }
+       
         self.check_mempool();
         self.synced_block_height += 1; 
         Ok(())
@@ -134,18 +163,18 @@ impl Mempool {
         // get all invalid tx in the mempool 
          let mut invalid_txs_hash = Vec::new();
             for tx in &self.txs {
-                let outputs = self.get_utxo(tx);
-                match outputs {
-                    Ok(outputs) => {
-                        if tx.verify(&outputs) < 0 {
-                            invalid_txs_hash.push(tx.get_tx_hash());
-                        }
-                    }
-                    Err(_) => {
+                // if the tx's utxo is not in the mempool, remove this tx 
+                for i in tx.transaction.inputs.iter() {
+                    if !self.utxo.contains_key(&(i.source_tx_hash, i.index)) {
                         invalid_txs_hash.push(tx.get_tx_hash());
+                        break;
                     }
                 }
             }
+        if invalid_txs_hash.len() != 0 {
+            debug!("remove invalid txs from mempool: {:?}", invalid_txs_hash);
+        }
+        
         // remove invalid tx from the txs
         for tx in invalid_txs_hash {
             self.txs.retain(|x| x.get_tx_hash() != tx);
@@ -194,9 +223,9 @@ mod tests{
         let tx = Transaction{inputs: inputs, outputs: outputs};
         let signed_tx = SignedTransaction{transaction: tx, fee: 10, witnesses: Vec::new()};
         // add utxo to the mempool
-        mempool.add_utxo((signed_tx.get_tx_hash(), 0), UTXO{output: signed_tx.transaction.outputs[0].clone(), used_in_mempool: false});
-        mempool.add_utxo((signed_tx.get_tx_hash(), 1), UTXO{output: signed_tx.transaction.outputs[1].clone(), used_in_mempool: false});
-        mempool.add_utxo((signed_tx.get_tx_hash(), 2), UTXO{output: signed_tx.transaction.outputs[2].clone(), used_in_mempool: false});
+        mempool.add_utxo((signed_tx.get_tx_hash(), 0), UTXO{output: signed_tx.transaction.outputs[0].clone(), used_in_mempool: false, used_height: 0} );
+        mempool.add_utxo((signed_tx.get_tx_hash(), 1), UTXO{output: signed_tx.transaction.outputs[1].clone(), used_in_mempool: false, used_height: 0});
+        mempool.add_utxo((signed_tx.get_tx_hash(), 2), UTXO{output: signed_tx.transaction.outputs[2].clone(), used_in_mempool: false, used_height: 0});
         // query utxo 
         let outputs = mempool.query_utxo(&key_a.public_key().as_ref().to_vec().hash());
         assert_eq!(outputs.len(), 2);
@@ -230,9 +259,9 @@ mod tests{
         let tx = Transaction{inputs: inputs, outputs: outputs};
         let signed_tx = SignedTransaction{transaction: tx, fee: 10, witnesses: Vec::new()};
         // add utxo to the mempool
-        mempool.add_utxo((signed_tx.get_tx_hash(), 0), UTXO{output: signed_tx.transaction.outputs[0].clone(), used_in_mempool: false});
-        mempool.add_utxo((signed_tx.get_tx_hash(), 1), UTXO{output: signed_tx.transaction.outputs[1].clone(), used_in_mempool: false});
-        mempool.add_utxo((signed_tx.get_tx_hash(), 2), UTXO{output: signed_tx.transaction.outputs[2].clone(), used_in_mempool: false});
+        mempool.add_utxo((signed_tx.get_tx_hash(), 0), UTXO{output: signed_tx.transaction.outputs[0].clone(), used_in_mempool: false, used_height: 0});
+        mempool.add_utxo((signed_tx.get_tx_hash(), 1), UTXO{output: signed_tx.transaction.outputs[1].clone(), used_in_mempool: false, used_height: 0});
+        mempool.add_utxo((signed_tx.get_tx_hash(), 2), UTXO{output: signed_tx.transaction.outputs[2].clone(), used_in_mempool: false, used_height: 0});
         // compose a new tx which spend utxo1 and utxo2 and utxo3, and send 150 btc to pk b, and 10 btc to pk a
         let mut outputs = Vec::new();
         outputs.push(Output{ pk_hash: key_b.public_key().as_ref().to_vec().hash(), value: 140});
@@ -302,9 +331,9 @@ mod tests{
         let tx = Transaction{inputs: inputs, outputs: outputs};
         let signed_tx = SignedTransaction{transaction: tx, fee: 10, witnesses: Vec::new()};
         // add utxo to the mempool
-        mempool.add_utxo((signed_tx.get_tx_hash(), 0), UTXO{output: signed_tx.transaction.outputs[0].clone(), used_in_mempool: false});
-        mempool.add_utxo((signed_tx.get_tx_hash(), 1), UTXO{output: signed_tx.transaction.outputs[1].clone(), used_in_mempool: false});
-        mempool.add_utxo((signed_tx.get_tx_hash(), 2), UTXO{output: signed_tx.transaction.outputs[2].clone(), used_in_mempool: false});
+        mempool.add_utxo((signed_tx.get_tx_hash(), 0), UTXO{output: signed_tx.transaction.outputs[0].clone(), used_in_mempool: false, used_height: 0});
+        mempool.add_utxo((signed_tx.get_tx_hash(), 1), UTXO{output: signed_tx.transaction.outputs[1].clone(), used_in_mempool: false, used_height: 0});
+        mempool.add_utxo((signed_tx.get_tx_hash(), 2), UTXO{output: signed_tx.transaction.outputs[2].clone(), used_in_mempool: false, used_height: 0});
         // compose a new tx which spend utxo1 and utxo2 and utxo3, and send 150 btc to pk b, and 10 btc to pk a
         let mut outputs = Vec::new();
         outputs.push(Output{ pk_hash: key_b.public_key().as_ref().to_vec().hash(), value: 140});

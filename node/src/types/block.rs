@@ -78,11 +78,13 @@ impl Block {
 fn generate_genesis_header() -> Header{
     // generate a 256 bits byte list with 16 bits zero, rest 1 
     let mut difficulty = H256::default();
-    difficulty.0[0] = 0;
-    difficulty.0[1] = 0;
-    for i in 2..32 {
+    
+    for i in 0..32 {
         difficulty.0[i] = 255;
     }
+    difficulty.0[0] = 0;
+    difficulty.0[1] = 0;
+    difficulty.0[2] = 32; 
     // make a static time stamp 
     use chrono::{TimeZone, Utc};
     let genesis_time = Utc.ymd(2023, 10, 01).and_hms(0,0,0); 
@@ -95,11 +97,12 @@ pub fn generate_random_header(parent: &H256) -> Header{
     //gen a difficulty with 10 bit zero in the first 256 bits in H256 
 
     let mut difficulty = H256::default();
+   
+    for i in 0..32 {
+        difficulty.0[i] = 255;
+    } 
     difficulty.0[0] = 0;
     difficulty.0[1] = 0;
-    for i in 2..32 {
-        difficulty.0[i] = 255;
-    }
 
     // nounce should be a random u32 using crate ring 
     let mut rng = rand::thread_rng();

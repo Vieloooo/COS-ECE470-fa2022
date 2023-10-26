@@ -1,0 +1,15 @@
+# start mining 
+
+http://127.0.0.1:7000/miner/start?lambda=1000000
+
+# check blocks 
+
+http://127.0.0.1:7000/blockchain/longest-chain 
+
+# list utxo 
+
+http://127.0.0.1:7000/utxo
+
+# list mempool txs 
+
+http://127.0.0.1:7000/mempool/txs

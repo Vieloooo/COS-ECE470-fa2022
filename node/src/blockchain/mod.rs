@@ -47,8 +47,8 @@ impl Blockchain {
         block.block.get_difficulty()
         
     }
-    /// Insert a block into blockchain, the block.parent must in the blockchain
-    /// if the finailized block changed, return false, else return true. Always return the finalized block hash 
+    /// Insert a block into blockchain, the block.parent must in the blockchain.
+    /// If the finailized block is not the the child of pre f blk, return false, else return true. Always return the finalized block hash 
     pub fn insert(&mut self, block: &Block) -> (bool, H256) {
         let mut okk = true; 
         //check if the block is already in the blocks
@@ -137,9 +137,14 @@ impl Blockchain {
     }
     /// get all blocks (with data) from genesis to finialized
     pub fn get_all_blocks_from_genesis_to_finialized(&self) -> Vec<Block> {
+        if self.height <=K {
+            //just return the genesis block
+            return vec![self.blocks.get(&self.finalized_block).unwrap().block.clone()];
+        }
         let mut blocks = vec![];
-        let mut block_hash = self.tail_block;
+        let mut block_hash = self.finalized_block;
         let mut block_height: i64 = self.height as i64;
+        block_height -= K as i64;
         while block_height >= 0 {
             let  bblock = self.blocks.get(&block_hash).unwrap().block.clone();
             block_hash = bblock.get_parent();

@@ -5,6 +5,7 @@ use super::block::Block;
 use super::hash::{Hashable, H256};
 use crate::types::mempool::Mempool;
 use crate::{blockchain::K, Blockchain};
+use log::{debug, info};
 #[derive(Clone)]
 pub struct BlockBuffer {
     buffer: HashMap<H256, Block>,
@@ -94,9 +95,9 @@ pub fn blockchain_insert_with_mempool_atomic(
     blockchain_unlocked: &mut Blockchain,
     unlocked_mempool: &mut Mempool,
 ) {
-    let (if_fork, new_finalized_block_hash) = blockchain_unlocked.insert(&_block);
+    let (not_fork, new_finalized_block_hash) = blockchain_unlocked.insert(&_block);
     // this means the new finalized block is not the child of the current fn blk, so we need to rebuild utxo and flush the mempool
-    if if_fork {
+    if !not_fork {
         //rebuild utxo and flush the mempool
         // get the new block from genesis to the fn block
         let new_blks = blockchain_unlocked.get_all_blocks_from_genesis_to_finialized();
@@ -113,6 +114,7 @@ pub fn blockchain_insert_with_mempool_atomic(
                 .blocks
                 .get(&new_finalized_block_hash)
                 .unwrap();
+            //info!("Update mempool using new finalized block {:?}", new_fb.block.hash());
             unlocked_mempool
                 .receive_finalized_block(&new_fb.block)
                 .unwrap();

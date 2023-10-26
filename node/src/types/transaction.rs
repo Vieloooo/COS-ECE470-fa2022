@@ -70,7 +70,7 @@ pub struct SignedTransaction {
     /// Transaction
     pub transaction: Transaction,
     /// Tx fee = sum input - sum outputs 
-    pub fee: u32, 
+    pub fee: u64, 
     /// sigature list for each input 
     pub witnesses: Vec<Witness>,
 }
@@ -82,13 +82,17 @@ impl SignedTransaction{
         if self.transaction.inputs.len() != self.witnesses.len(){
             return -1; 
         }
+        if self.transaction.inputs.len() != receiver_outputs.len(){
+            return -1; 
+        }
+        
         // verify the public key in the witness is correct 
         let l = self.transaction.inputs.len();
         for i in 0..l{
             let wit = &self.witnesses[i];
             let input = &self.transaction.inputs[i];
-            let output_hash = &receiver_outputs[input.index].pk_hash;
-            if wit.pubkey.hash() != *output_hash {
+            let src_output = &receiver_outputs[i];
+            if wit.pubkey.hash() != src_output.pk_hash{
                 return -1; 
             }
         }
