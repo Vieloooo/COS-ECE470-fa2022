@@ -24,7 +24,7 @@ An minimalistic bitcoin-like blockchain implemented in Rust:
     }
 ```
 - K-block confirmation/finalization. 
-- Mempool are finialized blocks are consistant. 
+- UTXO and mempool are consistant with the finalized blocks. 
 
 ## Usage 
 
