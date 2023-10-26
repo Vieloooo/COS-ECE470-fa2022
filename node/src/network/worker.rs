@@ -152,10 +152,12 @@ impl Worker {
                     debug!("NewTransactionHashes: {:?}", hashes);
                     let mut txs_I_dont_have = Vec::new();
                     let txs= & self.mempool.lock().unwrap().txs; 
+                    // txs that I have 
                     let mut txs_hash = Vec::new();
                     for tx in txs {
                         txs_hash.push(tx.get_tx_hash().clone());
                     }
+                    //filter txs that I don't have
                     for hash in hashes {
                         if !txs_hash.contains(&hash) {
                             txs_I_dont_have.push(hash.clone());
@@ -185,7 +187,7 @@ impl Worker {
                     for tx in input_txs {
                         let res = self.mempool.lock().unwrap().add_tx(&tx);
                         if res.is_err() {
-                            warn!("add tx failed");
+                            warn!("Received an invalid Tx {:?}", tx.get_tx_hash());
                         }
                     }
                 }

@@ -123,6 +123,19 @@ impl Server {
                             let v_string: Vec<String> = v.into_iter().map(|h|h.to_string()).collect();
                             respond_json!(req, v_string);
                         }
+                        "/blockchain/f-chain" => {
+                            let blockchain = blockchain.lock().unwrap();
+                            let v = blockchain.all_blocks_in_longest_chain();
+                           
+                            // remove the last 6 block hash if len > 6 
+                            let mut v_string: Vec<String> = v.into_iter().map(|h|h.to_string()).collect();
+                            if v_string.len() > 6{
+                               v_string = v_string[0..v_string.len()-6].to_vec();
+                            }
+                            
+
+                            respond_json!(req, v_string);
+                        }
                         "/blockchain/height" => {
                             let height = blockchain.lock().unwrap().height; 
                             respond_json!(req, height);

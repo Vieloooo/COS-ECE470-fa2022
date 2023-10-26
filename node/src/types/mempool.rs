@@ -73,6 +73,7 @@ impl Mempool {
         } 
         //add the tx in txs 
         self.txs.push(tx.clone());
+        
         Ok(())
     }
     /// generate a block body for the miner, return blody, merkle root and total fee 

@@ -25,11 +25,9 @@ impl BlockBuffer {
         mempool: &Arc<Mutex<Mempool>>,
     ) -> bool {
         // check if the parent of the block is in the blockchain
-
         let parent_hash = _block.header.parent;
-        let mut if_in = false;
         let mut blockchain_unlocked = blockchain.lock().unwrap();
-        if_in = blockchain_unlocked.blocks.contains_key(&parent_hash);
+        let if_in = blockchain_unlocked.blocks.contains_key(&parent_hash);
         if !if_in {
             // for orphan blocks, just insert into blocks
             self.buffer.insert(_block.hash(), _block);
@@ -56,6 +54,7 @@ impl BlockBuffer {
             blockchain_unlocked,
             &mut unlocked_mempool,
         );
+        
         // check buffer, push all pushable blocks from buffer to chain
         loop {
             let mut to_remove = Vec::new();
@@ -98,6 +97,8 @@ pub fn blockchain_insert_with_mempool_atomic(
     let (not_fork, new_finalized_block_hash) = blockchain_unlocked.insert(&_block);
     // this means the new finalized block is not the child of the current fn blk, so we need to rebuild utxo and flush the mempool
     if !not_fork {
+        use log::warn; 
+        warn!("A fork happened, rebuild the utxo from genesis to {:?}", new_finalized_block_hash);
         //rebuild utxo and flush the mempool
         // get the new block from genesis to the fn block
         let new_blks = blockchain_unlocked.get_all_blocks_from_genesis_to_finialized();
